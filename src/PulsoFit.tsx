@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useAuth } from "./auth";
+import { supabase } from "./supabase";
 
 /* ============================================================
    PULSO — Web de entrenamiento y nutrición, estilo editorial
@@ -181,8 +183,20 @@ export default function App() {
   const [fase, setFase] = useState("hero");
   const [paso, setPaso] = useState(0);
   const [datos, setDatos] = useState({ objetivo: null, sexo: null, edad: 28, peso: 75, altura: 172, nivel: null, dias: 3 });
+  const [authAbierto, setAuthAbierto] = useState(false);
+  const [planGuardado, setPlanGuardado] = useState(null);
   const set = (k, v) => setDatos((d) => ({ ...d, [k]: v }));
+  const { user } = useAuth();
   useEffect(() => { window.scrollTo(0, 0); }, [fase, paso]);
+
+  // Al iniciar sesión, recupera el último plan guardado del usuario.
+  useEffect(() => {
+    if (!supabase || !user) { setPlanGuardado(null); return; }
+    supabase.from("planes").select("datos").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => setPlanGuardado(data?.datos ?? null));
+  }, [user]);
+
+  const retomarPlan = () => { if (planGuardado) { setDatos(planGuardado); setFase("plan"); } };
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
@@ -198,15 +212,96 @@ export default function App() {
         @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; } }
         .exwrap:hover .eximg { transform: scale(1.06); }
       `}</style>
-      {fase === "hero" && <Hero onStart={() => setFase("form")} />}
+      {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} />}
       {fase === "form" && <Formulario datos={datos} set={set} paso={paso} setPaso={setPaso} onFinish={() => setFase("scan")} onBack={() => setFase("hero")} />}
       {fase === "scan" && <Scan onDone={() => setFase("plan")} />}
-      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null, nivel: null })); setFase("hero"); }} />}
+      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null, nivel: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} />}
+      {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
   );
 }
 
-function Hero({ onStart }) {
+function AuthModal({ onClose }) {
+  const { signIn, signUp } = useAuth();
+  const [modo, setModo] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    setError(""); setAviso(""); setCargando(true);
+    try {
+      if (modo === "login") {
+        const { error } = await signIn(email, password);
+        if (error) setError(traducirError(error.message)); else onClose();
+      } else {
+        const { error, needsConfirm } = await signUp(email, password);
+        if (error) setError(traducirError(error.message));
+        else if (needsConfirm) setAviso("Te hemos enviado un email para confirmar tu cuenta. Ábrelo y luego inicia sesión.");
+        else onClose();
+      }
+    } finally { setCargando(false); }
+  };
+
+  const input = { width: "100%", padding: "14px 16px", borderRadius: 12, background: C.bg, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15, marginTop: 10 };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: 20, zIndex: 100 }}>
+      <div onClick={(e) => e.stopPropagation()} className="fadeUp" style={{ width: "100%", maxWidth: 400, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 22, padding: 26 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ ...DF, fontWeight: 800, fontSize: 22 }}>{modo === "login" ? "Iniciar sesión" : "Crear cuenta"}</div>
+          <button onClick={onClose} aria-label="Cerrar" style={{ background: "none", border: "none", color: C.dim, fontSize: 24, lineHeight: 1 }}>×</button>
+        </div>
+        <p style={{ color: C.dim, fontSize: 13, marginTop: 6 }}>Guarda tu plan y sigue tu progreso desde cualquier dispositivo.</p>
+        <form onSubmit={enviar}>
+          <input style={input} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <input style={input} type="password" placeholder="Contraseña (mín. 6 caracteres)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={modo === "login" ? "current-password" : "new-password"} />
+          {error && <div style={{ color: C.hot1, fontSize: 13, marginTop: 12 }}>{error}</div>}
+          {aviso && <div style={{ color: C.hot2, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>{aviso}</div>}
+          <button type="submit" disabled={cargando} style={{ ...grad, width: "100%", marginTop: 18, border: "none", color: "#0A0B0D", fontWeight: 800, fontSize: 15, padding: 15, borderRadius: 999, opacity: cargando ? 0.6 : 1 }}>
+            {cargando ? "Un momento…" : modo === "login" ? "Entrar" : "Registrarme"}
+          </button>
+        </form>
+        <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: C.dim }}>
+          {modo === "login" ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
+          <button onClick={() => { setModo(modo === "login" ? "registro" : "login"); setError(""); setAviso(""); }} style={{ background: "none", border: "none", ...gradText, fontWeight: 700, fontSize: 13 }}>
+            {modo === "login" ? "Regístrate" : "Inicia sesión"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function traducirError(msg) {
+  const m = (msg || "").toLowerCase();
+  if (m.includes("invalid login")) return "Email o contraseña incorrectos.";
+  if (m.includes("already registered")) return "Ese email ya está registrado. Inicia sesión.";
+  if (m.includes("password")) return "La contraseña debe tener al menos 6 caracteres.";
+  if (m.includes("email")) return "Revisa el email introducido.";
+  return "No se ha podido completar. Inténtalo de nuevo.";
+}
+
+// Chip de sesión reutilizable en las cabeceras (login / usuario).
+function CuentaChip({ onLogin, oscuro }) {
+  const { enabled, ready, user, signOut } = useAuth();
+  if (!enabled || !ready) return null;
+  const base = { borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700 };
+  if (!user) return (
+    <button onClick={onLogin} style={{ ...base, ...grad, border: "none", color: "#0A0B0D" }}>Iniciar sesión</button>
+  );
+  const nombre = (user.email || "").split("@")[0];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 13, color: oscuro ? C.text : C.text, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>👤 {nombre}</span>
+      <button onClick={() => signOut()} style={{ ...base, background: oscuro ? "rgba(0,0,0,.4)" : C.panel, border: `1px solid ${C.line}`, color: C.text }}>Salir</button>
+    </div>
+  );
+}
+
+function Hero({ onStart, onLogin, planGuardado, onRetomar }) {
   return (
     <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
@@ -214,17 +309,20 @@ function Hero({ onStart }) {
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(10,11,13,.55) 0%, rgba(10,11,13,.35) 40%, rgba(10,11,13,.92) 100%)` }} />
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(900px 480px at 78% 12%, rgba(255,77,46,.28), transparent 62%)` }} />
       </div>
-      <header style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 28px" }}>
+      <header style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 28px", gap: 12 }}>
         <div style={{ ...DF, fontWeight: 800, fontSize: 24, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.2em", textTransform: "uppercase" }}>Entrena · Come · Progresa</div>
+        <CuentaChip onLogin={onLogin} oscuro />
       </header>
       <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 28px 9vh", maxWidth: 1100 }}>
         <div style={{ fontSize: 13, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 20, fontWeight: 700 }}>Tu plan. Tu cuerpo. Tus reglas.</div>
         <h1 style={{ ...DF, fontSize: "clamp(46px, 9vw, 118px)", fontWeight: 800, lineHeight: 0.95, margin: 0 }}>Entrena con<br /><span style={gradText}>intención.</span></h1>
         <p style={{ color: "#D7DADF", fontSize: 18, maxWidth: 540, lineHeight: 1.6, marginTop: 26 }}>Dinos tu objetivo, edad y peso. En segundos generamos tu dieta semanal completa y tus entrenamientos, con cada ejercicio ilustrado y explicado paso a paso.</p>
-        <div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
           <button onClick={onStart} style={{ ...grad, marginTop: 34, border: "none", color: "#0A0B0D", fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: "19px 56px", borderRadius: 999, boxShadow: "0 10px 44px rgba(255,77,46,.4)", transition: "transform .15s" }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>CREAR MI PLAN GRATIS →</button>
+          {planGuardado && (
+            <button onClick={onRetomar} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>↩ Continuar con mi plan guardado</button>
+          )}
         </div>
         <div style={{ display: "flex", gap: 48, marginTop: 60, flexWrap: "wrap" }}>
           {[["4", "objetivos"], ["7 días", "de dieta"], [`${Object.keys(EX).length}`, "ejercicios con foto"]].map(([n, t]) => (
@@ -341,14 +439,25 @@ function Scan({ onDone }) {
   );
 }
 
-function Plan({ datos, onReset }) {
+function Plan({ datos, onReset, onLogin }) {
   const [tab, setTab] = useState("entreno");
   const [diaDieta, setDiaDieta] = useState(0);
   const [exAbierto, setExAbierto] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
+  const { user, enabled } = useAuth();
   const m = useMemo(() => calcularMetricas(datos), [datos]);
   const entreno = useMemo(() => buildWorkout(datos.objetivo, datos.nivel, datos.dias), [datos]);
   const dieta = useMemo(() => buildDiet(datos.objetivo), [datos.objetivo]);
   const obj = OBJETIVOS.find((o) => o.id === datos.objetivo);
+
+  // Si el usuario ha iniciado sesión, guarda su plan en la nube (uno por usuario).
+  useEffect(() => {
+    if (!supabase || !user || !datos.objetivo) return;
+    let vivo = true;
+    supabase.from("planes").upsert({ user_id: user.id, datos, actualizado_en: new Date().toISOString() }, { onConflict: "user_id" })
+      .then(({ error }) => { if (vivo && !error) { setGuardado(true); setTimeout(() => vivo && setGuardado(false), 2500); } });
+    return () => { vivo = false; };
+  }, [user, datos]);
 
   const descargarPDF = async () => {
     // Carga diferida: jsPDF solo se descarga cuando el usuario pide el PDF.
@@ -435,9 +544,11 @@ function Plan({ datos, onReset }) {
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
         <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
           <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+            {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700 }}>✓ Guardado</span>}
             <button onClick={descargarPDF} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "8px 18px", fontSize: 13, boxShadow: "0 6px 22px rgba(255,77,46,.35)" }}>⬇ Descargar PDF</button>
             <button onClick={onReset} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>↺ Empezar de nuevo</button>
+            <CuentaChip onLogin={onLogin} oscuro />
           </div>
         </header>
         <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
