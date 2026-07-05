@@ -286,6 +286,85 @@ function Plan({ datos, onReset }) {
   const entreno = useMemo(() => buildWorkout(datos.objetivo, datos.nivel, datos.dias), [datos]);
   const dieta = useMemo(() => buildDiet(datos.objetivo), [datos.objetivo]);
   const obj = OBJETIVOS.find((o) => o.id === datos.objetivo);
+
+  const descargarPDF = async () => {
+    // Carga diferida: jsPDF solo se descarga cuando el usuario pide el PDF.
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 42;
+    const maxW = pageW - margin * 2;
+    let y = margin;
+    // jsPDF con fuentes estándar no dibuja algunos glifos (guion largo, ×, ·):
+    // los sustituimos por equivalentes ASCII para que el PDF salga limpio.
+    const san = (s) => String(s).replace(/[–—]/g, "-").replace(/×/g, "x").replace(/·/g, "-").replace(/≥/g, ">=");
+    const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
+    const ensure = (h) => { if (y + h > pageH - margin) { doc.addPage(); y = margin; } };
+    const line = (str, o: any = {}) => {
+      const { size = 11, style = "normal", color = [34, 34, 34], gap = 5, indent = 0 } = o;
+      doc.setFont("helvetica", style);
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.splitTextToSize(san(str), maxW - indent).forEach((ln) => {
+        ensure(size + gap);
+        doc.text(ln, margin + indent, y);
+        y += size + gap;
+      });
+    };
+    const space = (h = 8) => { y += h; };
+    const rule = () => { ensure(16); doc.setDrawColor(224); doc.line(margin, y, pageW - margin, y); y += 16; };
+
+    line("PULSO", { size: 24, style: "bold", color: [255, 77, 46], gap: 3 });
+    line("Tu plan personalizado", { size: 15, style: "bold" });
+    space(4);
+    line(`Objetivo: ${obj?.titulo}   |   Nivel: ${cap(datos.nivel)}   |   ${datos.dias} entrenos/semana`, { size: 10, color: [110, 110, 110], gap: 3 });
+    line(`${cap(datos.sexo)} · ${datos.edad} años · ${datos.peso} kg · ${datos.altura} cm`, { size: 10, color: [110, 110, 110] });
+    space(8);
+
+    line("OBJETIVO NUTRICIONAL DIARIO", { size: 12, style: "bold" });
+    space(2);
+    line(`Calorías: ${m.kcal} kcal      Proteína: ${m.prot} g      Carbohidratos: ${m.carbs} g      Grasas: ${m.grasa} g`, { size: 11 });
+    space(6);
+    rule();
+
+    line("ENTRENAMIENTO", { size: 15, style: "bold", color: [255, 77, 46] });
+    space(4);
+    entreno.forEach((dia) => {
+      ensure(50);
+      line(dia.titulo, { size: 12.5, style: "bold" });
+      line(dia.foco, { size: 9, color: [125, 125, 125] });
+      space(3);
+      dia.ejercicios.forEach((ex) => {
+        ensure(34);
+        line(`•  ${ex.nombre}   (${ex.musculo})`, { size: 10.5, style: "bold", indent: 6, gap: 3 });
+        line(`${ex.series} series × ${ex.reps}   ·   descanso ${ex.descanso}`, { size: 9.5, color: [90, 90, 90], indent: 16, gap: 3 });
+        ex.pasos.forEach((p, i) => line(`${i + 1}. ${p}`, { size: 9, color: [115, 115, 115], indent: 16, gap: 2 }));
+        space(4);
+      });
+      space(6);
+    });
+    rule();
+
+    line("DIETA SEMANAL", { size: 15, style: "bold", color: [255, 77, 46] });
+    space(4);
+    dieta.forEach((d) => {
+      ensure(50);
+      line(d.dia, { size: 12.5, style: "bold" });
+      space(1);
+      d.comidas.forEach((c) => {
+        ensure(26);
+        line(`${c.hora}  ·  ${c.nombre}`, { size: 9.5, style: "bold", color: [90, 90, 90], indent: 6, gap: 2 });
+        line(c.plato, { size: 10, indent: 16, gap: 3 });
+      });
+      space(7);
+    });
+    space(4);
+    line("Plan orientativo con fines informativos. No sustituye el consejo de un médico o dietista.", { size: 8, color: [150, 150, 150] });
+
+    doc.save(`plan-pulso-${datos.objetivo}.pdf`);
+  };
+
   return (
     <div>
       <div style={{ position: "relative", height: 340, overflow: "hidden" }}>
@@ -293,7 +372,10 @@ function Plan({ datos, onReset }) {
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
         <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
           <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-          <button onClick={onReset} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>↺ Empezar de nuevo</button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button onClick={descargarPDF} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "8px 18px", fontSize: 13, boxShadow: "0 6px 22px rgba(255,77,46,.35)" }}>⬇ Descargar PDF</button>
+            <button onClick={onReset} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>↺ Empezar de nuevo</button>
+          </div>
         </header>
         <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
           <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>Tu plan · {obj?.titulo}</div>
