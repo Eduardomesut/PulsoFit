@@ -17,8 +17,12 @@ const grad = { backgroundImage: `linear-gradient(90deg, ${C.hot1}, ${C.hot2})` }
 const gradText = { backgroundImage: `linear-gradient(90deg, ${C.hot1}, ${C.hot2})`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" };
 const DF = { fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", letterSpacing: "-0.03em" };
 const U = (id, w = 1600) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
+// Imagen de reserva (degradado de marca) si alguna foto no carga: evita el icono de "imagen rota".
+const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#FF4D2E'/><stop offset='1' stop-color='#FF9A3C'/></linearGradient></defs><rect width='400' height='400' fill='#1A1D22'/><circle cx='200' cy='210' r='78' fill='url(#g)' opacity='0.28'/><circle cx='200' cy='210' r='40' fill='url(#g)' opacity='0.5'/></svg>`)}`;
+const onImgError = (e) => { const t = e.currentTarget; if (t.src !== FALLBACK_IMG) t.src = FALLBACK_IMG; };
 
 const EXIMG = {
+  // Peso libre / cuerpo
   sentadilla: U("1574680096145-d05b474e2155", 800), flexiones: U("1598971639058-fab3c3109a00", 800),
   pesoMuerto: U("1517963879433-6ad2b056d712", 800), remo: U("1534368420009-621bfab424a8", 800),
   press: U("1583454110551-21f2fa2afe61", 800), zancada: U("1434608519344-49d77a699e1d", 800),
@@ -27,6 +31,16 @@ const EXIMG = {
   pressBanca: U("1534438327276-14e5300c3a48", 800), jalon: U("1598575468023-4a4a1e40d1c9", 800),
   hipThrust: U("1517836357463-d25dfeac3438", 800), correr: U("1571008887538-b36bb32f4571", 800),
   jumping: U("1518611012118-696072aa579a", 800), laterales: U("1541534741688-6078c6bfb5c5", 800),
+  // Máquinas de gimnasio
+  prensa: U("1534258936925-c58bed479fcb", 800), extCuadriceps: U("1584863231364-2edc166de576", 800),
+  curlFemoral: U("1596357395217-80de13130e92", 800), aductores: U("1518310383802-640c2de311b2", 800),
+  abductores: U("1517344884509-a0c97ec11bcc", 800), gemelos: U("1550345332-09e3ac987658", 800),
+  pressPecho: U("1591741535018-d042766c62eb", 800), contractora: U("1581122584612-713f89daa8eb", 800),
+  remoPolea: U("1526506118085-60ce8714f8c5", 800), pressHombro: U("1532029837206-abbe2b7620e3", 800),
+  tricepsPolea: U("1605296867304-46d5465a13f1", 800), curlPolea: U("1574680178050-55c6a6a96e0a", 800),
+  abdominalMaquina: U("1571019614242-c5c5dee9f50b", 800), gluteoPolea: U("1594381898411-846e7d193883", 800),
+  bici: U("1534787238916-9ba6764efd4f", 800), eliptica: U("1540497077202-7c8a3999166f", 800),
+  remoErgometro: U("1519505907962-0a6cb0167c73", 800),
 };
 
 const EX = {
@@ -46,13 +60,32 @@ const EX = {
   correr: { nombre: "Carrera por intervalos", musculo: "Cardio", pasos: ["Calienta 5 min trotando suave.", "Alterna 1 min rápido con 2 min suaves.", "Repite el ciclo el tiempo indicado.", "Termina con 5 min de trote suave y estiramientos."] },
   jumping: { nombre: "Jumping jacks", musculo: "Cardio", pasos: ["De pie, brazos a los lados y pies juntos.", "Salta abriendo piernas y subiendo los brazos.", "Vuelve a la posición inicial con otro salto.", "Ritmo constante, aterriza suave."] },
   laterales: { nombre: "Elevaciones laterales", musculo: "Hombro", pasos: ["De pie, mancuernas ligeras a los lados.", "Sube los brazos a los lados hasta la altura del hombro.", "Codos ligeramente flexionados, sin balancearte.", "Baja lento resistiendo el peso."] },
+  // --- Máquinas de gimnasio ---
+  prensa: { nombre: "Prensa de piernas (máquina)", musculo: "Cuádriceps · Glúteo", pasos: ["Siéntate con la espalda y la cadera bien apoyadas en el respaldo.", "Coloca los pies en la plataforma a la anchura de los hombros.", "Quita los seguros y baja flexionando las rodillas hasta unos 90°.", "Empuja con toda la planta del pie sin bloquear del todo las rodillas arriba."] },
+  extCuadriceps: { nombre: "Extensión de cuádriceps (máquina)", musculo: "Cuádriceps", pasos: ["Ajusta el respaldo para que las rodillas queden alineadas con el eje de giro.", "Coloca el rodillo sobre la parte baja de las espinillas.", "Estira las piernas subiendo el peso hasta casi bloquear la rodilla.", "Aprieta el cuádriceps arriba y baja lento y controlado."] },
+  curlFemoral: { nombre: "Curl femoral (máquina)", musculo: "Femoral", pasos: ["Túmbate o siéntate según el modelo, rodillas alineadas con el eje.", "El rodillo apoyado justo encima del talón (tendón de Aquiles).", "Flexiona llevando el talón hacia el glúteo.", "Aprieta el femoral en el punto máximo y baja controlando."] },
+  aductores: { nombre: "Máquina de aductores", musculo: "Aductores (cara interna)", pasos: ["Siéntate con la espalda apoyada y las piernas abiertas sobre los apoyos.", "Ajusta la amplitud de apertura a una que sea cómoda.", "Junta las piernas apretando la cara interna de los muslos.", "Vuelve despacio a la apertura inicial sin soltar de golpe."] },
+  abductores: { nombre: "Máquina de abductores", musculo: "Glúteo medio", pasos: ["Siéntate con la espalda apoyada y las piernas juntas sobre los apoyos.", "Empuja hacia fuera abriendo las piernas todo lo que permita el rango.", "Aprieta los glúteos en la máxima apertura un segundo.", "Cierra despacio resistiendo el peso."] },
+  gemelos: { nombre: "Elevación de gemelos (máquina)", musculo: "Gemelos", pasos: ["Coloca las puntas de los pies en el borde de la plataforma, talones al aire.", "Apoya los hombros bajo las almohadillas (o el peso según el modelo).", "Sube empujando con las puntas lo más alto posible.", "Baja el talón por debajo del escalón para estirar y repite."] },
+  pressPecho: { nombre: "Press de pecho (máquina)", musculo: "Pecho · Tríceps", pasos: ["Ajusta el asiento para que las manetas queden a la altura del pecho.", "Espalda apoyada, escápulas juntas y pies firmes en el suelo.", "Empuja las manetas al frente hasta casi estirar los brazos.", "Vuelve controlando hasta notar estiramiento en el pecho."] },
+  contractora: { nombre: "Contractora / Peck deck", musculo: "Pecho", pasos: ["Ajusta el asiento para que los brazos queden paralelos al suelo.", "Antebrazos apoyados en las almohadillas, codos a la altura del hombro.", "Junta las almohadillas al frente apretando el pecho.", "Abre despacio sin dejar que el peso tire de más de la cuenta."] },
+  remoPolea: { nombre: "Remo en polea baja", musculo: "Espalda · Bíceps", pasos: ["Siéntate con rodillas semiflexionadas y agarra el triángulo o la barra.", "Espalda recta y pecho arriba, brazos estirados al inicio.", "Tira llevando los codos atrás y pegados al cuerpo hasta el abdomen.", "Aprieta la espalda un instante y vuelve estirando sin encorvarte."] },
+  pressHombro: { nombre: "Press de hombro (máquina)", musculo: "Hombro · Tríceps", pasos: ["Ajusta el asiento para que las manetas queden a la altura de los hombros.", "Espalda bien apoyada en el respaldo.", "Empuja hacia arriba hasta casi estirar los brazos, sin bloquear.", "Baja controlando hasta la altura de las orejas."] },
+  tricepsPolea: { nombre: "Extensión de tríceps en polea", musculo: "Tríceps", pasos: ["De pie frente a la polea alta con barra o cuerda.", "Codos pegados al cuerpo y fijos durante todo el movimiento.", "Estira los brazos hacia abajo hasta bloquear el codo.", "Sube controlando solo hasta que el antebrazo quede horizontal."] },
+  curlPolea: { nombre: "Curl de bíceps en polea", musculo: "Bíceps", pasos: ["De pie frente a la polea baja con barra o cuerda.", "Codos pegados a los costados y fijos.", "Flexiona subiendo el agarre hacia los hombros.", "Aprieta el bíceps arriba y baja lento resistiendo."] },
+  abdominalMaquina: { nombre: "Máquina de abdominales", musculo: "Core · Abdomen", pasos: ["Ajusta el asiento y agarra las manetas o el apoyo del pecho.", "Contrae el abdomen llevando el pecho hacia las caderas (encógete).", "El movimiento nace del abdomen, no de tirar con los brazos.", "Vuelve despacio sin soltar la tensión del core."] },
+  gluteoPolea: { nombre: "Patada de glúteo en polea", musculo: "Glúteo", pasos: ["Coloca la cincha en el tobillo, de frente a la polea baja.", "Sujétate a la estructura y mantén el tronco ligeramente inclinado.", "Lleva la pierna hacia atrás estirada apretando el glúteo.", "Vuelve controlando sin arquear la zona lumbar. Cambia de pierna."] },
+  bici: { nombre: "Bicicleta estática", musculo: "Cardio", pasos: ["Ajusta la altura del sillín: rodilla casi estirada abajo.", "Empieza con 3-4 min a ritmo suave para calentar.", "Mantén una cadencia constante con una resistencia media.", "Puedes alternar 1 min fuerte / 2 min suave si buscas intervalos."] },
+  eliptica: { nombre: "Elíptica", musculo: "Cardio", pasos: ["Súbete con los pies en los pedales y agarra los manillares móviles.", "Mantén el tronco erguido y el abdomen activo.", "Empuja con piernas y brazos a un ritmo fluido y constante.", "Ajusta la resistencia para mantener una intensidad media-alta."] },
+  remoErgometro: { nombre: "Remo en máquina (remo-ergómetro)", musculo: "Cardio · Espalda", pasos: ["Sujeta los pies con las cinchas y agarra la barra con los brazos estirados.", "Empuja primero con las piernas, luego inclina el tronco y tira con los brazos.", "Termina con la barra bajo el pecho y los codos atrás.", "Vuelve en orden inverso: brazos, tronco y por último piernas."] },
 };
 
 function seriesReps(objetivo, nivel, ex) {
-  const cardio = ["burpee", "escalador", "jumping", "correr"].includes(ex);
-  if (ex === "correr") return { series: "1", reps: nivel === "principiante" ? "15 min" : nivel === "intermedio" ? "20 min" : "25 min", descanso: "—" };
+  const cardioMin = ["correr", "bici", "eliptica", "remoErgometro"].includes(ex);
+  const cardioHIIT = ["burpee", "escalador", "jumping"].includes(ex);
+  if (cardioMin) return { series: "1", reps: nivel === "principiante" ? "12 min" : nivel === "intermedio" ? "18 min" : "22 min", descanso: "—" };
   if (ex === "plancha") return { series: nivel === "principiante" ? "3" : "4", reps: nivel === "principiante" ? "30 seg" : nivel === "intermedio" ? "45 seg" : "60 seg", descanso: "45 seg" };
-  if (cardio) return { series: nivel === "principiante" ? "3" : "4", reps: nivel === "principiante" ? "30 seg" : "40 seg", descanso: "30 seg" };
+  if (cardioHIIT) return { series: nivel === "principiante" ? "3" : "4", reps: nivel === "principiante" ? "30 seg" : "40 seg", descanso: "30 seg" };
   if (objetivo === "ganar") return nivel === "principiante" ? { series: "3", reps: "8–10", descanso: "90 seg" } : nivel === "intermedio" ? { series: "4", reps: "8–10", descanso: "90 seg" } : { series: "4", reps: "6–8", descanso: "2 min" };
   if (objetivo === "perder") return { series: nivel === "principiante" ? "3" : "4", reps: "12–15", descanso: "45 seg" };
   if (objetivo === "resistencia") return { series: "3", reps: "15–20", descanso: "30 seg" };
@@ -63,17 +96,17 @@ function buildWorkout(objetivo, nivel, dias) {
   const d3 = dias === 3;
   let plan;
   if (objetivo === "ganar") plan = d3
-    ? [{ titulo: "Día 1 · Empuje", foco: "Pecho, hombro y tríceps", lista: ["pressBanca", "press", "flexiones", "laterales"] }, { titulo: "Día 2 · Tirón", foco: "Espalda y bíceps", lista: ["jalon", "remo", "pesoMuerto", "curl"] }, { titulo: "Día 3 · Pierna", foco: "Piernas, glúteo y core", lista: ["sentadilla", "zancada", "hipThrust", "plancha"] }]
-    : [{ titulo: "Día 1 · Torso", foco: "Pecho, espalda y hombro", lista: ["pressBanca", "jalon", "press", "remo", "curl"] }, { titulo: "Día 2 · Pierna", foco: "Piernas, glúteo y core", lista: ["sentadilla", "pesoMuerto", "zancada", "hipThrust", "plancha"] }];
+    ? [{ titulo: "Día 1 · Empuje", foco: "Pecho, hombro y tríceps", lista: ["pressBanca", "pressPecho", "pressHombro", "contractora", "laterales", "tricepsPolea"] }, { titulo: "Día 2 · Tirón", foco: "Espalda y bíceps", lista: ["jalon", "remoPolea", "remo", "pesoMuerto", "curl", "curlPolea"] }, { titulo: "Día 3 · Pierna", foco: "Piernas, glúteo y core", lista: ["sentadilla", "prensa", "extCuadriceps", "curlFemoral", "hipThrust", "gemelos", "abdominalMaquina"] }]
+    : [{ titulo: "Día 1 · Torso", foco: "Pecho, espalda y hombro", lista: ["pressBanca", "pressPecho", "jalon", "remoPolea", "pressHombro", "curl", "tricepsPolea"] }, { titulo: "Día 2 · Pierna y core", foco: "Piernas, glúteo y abdomen", lista: ["sentadilla", "prensa", "extCuadriceps", "curlFemoral", "hipThrust", "gemelos", "plancha"] }];
   else if (objetivo === "perder") plan = d3
-    ? [{ titulo: "Día 1 · Full body A", foco: "Fuerza + quema", lista: ["sentadilla", "flexiones", "remo", "zancada", "plancha"] }, { titulo: "Día 2 · Cardio HIIT", foco: "Máxima quema calórica", lista: ["correr", "burpee", "escalador", "jumping"] }, { titulo: "Día 3 · Full body B", foco: "Fuerza + quema", lista: ["pesoMuerto", "press", "hipThrust", "escalador", "plancha"] }]
-    : [{ titulo: "Día 1 · Full body A", foco: "Fuerza + quema", lista: ["sentadilla", "flexiones", "remo", "burpee", "plancha"] }, { titulo: "Día 2 · Full body B", foco: "Fuerza + cardio", lista: ["pesoMuerto", "press", "zancada", "escalador", "jumping"] }];
+    ? [{ titulo: "Día 1 · Full body A", foco: "Fuerza + quema", lista: ["sentadilla", "prensa", "pressPecho", "remoPolea", "abdominalMaquina", "plancha"] }, { titulo: "Día 2 · Cardio máquinas + HIIT", foco: "Máxima quema calórica", lista: ["bici", "eliptica", "remoErgometro", "burpee", "escalador"] }, { titulo: "Día 3 · Full body B", foco: "Fuerza + quema", lista: ["pesoMuerto", "pressHombro", "jalon", "hipThrust", "gluteoPolea", "plancha"] }]
+    : [{ titulo: "Día 1 · Full body + cardio", foco: "Fuerza + quema", lista: ["sentadilla", "prensa", "pressPecho", "remoPolea", "bici", "plancha"] }, { titulo: "Día 2 · Full body + cardio", foco: "Fuerza + cardio", lista: ["pesoMuerto", "pressHombro", "jalon", "hipThrust", "eliptica", "escalador"] }];
   else if (objetivo === "resistencia") plan = d3
-    ? [{ titulo: "Día 1 · Circuito metabólico", foco: "Resistencia muscular", lista: ["sentadilla", "flexiones", "zancada", "escalador", "plancha"] }, { titulo: "Día 2 · Cardio intervalos", foco: "Capacidad aeróbica", lista: ["correr", "jumping", "burpee"] }, { titulo: "Día 3 · Circuito total", foco: "Cuerpo completo", lista: ["pesoMuerto", "remo", "press", "escalador", "plancha"] }]
-    : [{ titulo: "Día 1 · Circuito total", foco: "Resistencia muscular", lista: ["sentadilla", "flexiones", "remo", "escalador", "plancha"] }, { titulo: "Día 2 · Cardio + core", foco: "Capacidad aeróbica", lista: ["correr", "burpee", "jumping", "plancha"] }];
+    ? [{ titulo: "Día 1 · Circuito metabólico", foco: "Resistencia muscular", lista: ["prensa", "pressPecho", "remoPolea", "zancada", "abdominalMaquina", "escalador"] }, { titulo: "Día 2 · Cardio máquinas", foco: "Capacidad aeróbica", lista: ["bici", "eliptica", "remoErgometro", "jumping"] }, { titulo: "Día 3 · Circuito total", foco: "Cuerpo completo", lista: ["sentadilla", "jalon", "pressHombro", "curlFemoral", "plancha", "burpee"] }]
+    : [{ titulo: "Día 1 · Circuito total", foco: "Resistencia muscular", lista: ["sentadilla", "pressPecho", "remoPolea", "zancada", "escalador", "plancha"] }, { titulo: "Día 2 · Cardio + core", foco: "Capacidad aeróbica", lista: ["bici", "eliptica", "remoErgometro", "abdominalMaquina", "plancha"] }];
   else plan = d3
-    ? [{ titulo: "Día 1 · Fuerza torso", foco: "Músculo + tono", lista: ["pressBanca", "jalon", "press", "curl"] }, { titulo: "Día 2 · Fuerza pierna", foco: "Piernas y glúteo", lista: ["sentadilla", "pesoMuerto", "zancada", "hipThrust"] }, { titulo: "Día 3 · Metabólico", foco: "Quema + core", lista: ["burpee", "escalador", "jumping", "plancha"] }]
-    : [{ titulo: "Día 1 · Fuerza total", foco: "Músculo + tono", lista: ["sentadilla", "pressBanca", "remo", "press", "plancha"] }, { titulo: "Día 2 · Fuerza + quema", foco: "Pierna y cardio", lista: ["pesoMuerto", "zancada", "hipThrust", "burpee", "escalador"] }];
+    ? [{ titulo: "Día 1 · Fuerza torso", foco: "Músculo + tono", lista: ["pressBanca", "pressPecho", "jalon", "remoPolea", "pressHombro", "curl", "tricepsPolea"] }, { titulo: "Día 2 · Fuerza pierna", foco: "Piernas y glúteo", lista: ["sentadilla", "prensa", "extCuadriceps", "curlFemoral", "hipThrust", "gemelos"] }, { titulo: "Día 3 · Metabólico + core", foco: "Quema + core", lista: ["bici", "eliptica", "burpee", "escalador", "abdominalMaquina", "plancha"] }]
+    : [{ titulo: "Día 1 · Fuerza total", foco: "Músculo + tono", lista: ["sentadilla", "prensa", "pressBanca", "remoPolea", "pressHombro", "plancha"] }, { titulo: "Día 2 · Fuerza + quema", foco: "Pierna y cardio", lista: ["pesoMuerto", "prensa", "hipThrust", "jalon", "bici", "escalador"] }];
   return plan.map((d) => ({ ...d, ejercicios: d.lista.map((k) => ({ key: k, ...EX[k], ...seriesReps(objetivo, nivel, k) })) }));
 }
 
@@ -83,6 +116,36 @@ const DIETAS = {
   ambos: { desayunos: ["Avena (50 g) con yogur griego y frutos rojos", "3 huevos revueltos con pan integral y tomate", "Batido: leche, plátano, avena (40 g) y proteína", "Tostadas integrales con aguacate y huevo poché"], comidas: ["Pollo (180 g) con arroz integral (80 g) y verduras", "Salmón con quinoa (70 g) y espárragos", "Lentejas con arroz y huevo duro", "Ternera magra con patata asada y ensalada"], cenas: ["Merluza al horno con boniato pequeño y brócoli", "Revuelto de 3 huevos con champiñones", "Pechuga de pavo con puré de patata y calabacín", "Ensalada de atún, huevo, aguacate y picatostes"], snacks: ["Yogur griego + nueces", "Fruta + queso fresco", "Batido de proteína", "Tortitas de arroz con crema de cacahuete"] },
   resistencia: { desayunos: ["Porridge de avena (60 g) con plátano y miel", "Tostadas integrales con mermelada y yogur griego", "Batido: leche, avena, frutos rojos y plátano", "Tortilla de 2 huevos con pan integral y zumo natural"], comidas: ["Pasta integral (90 g) con pollo y tomate", "Arroz (90 g) con salmón y verduras", "Cuscús con garbanzos, pasas y pollo", "Patata asada con atún y ensalada"], cenas: ["Arroz (60 g) con huevo y pisto", "Pescado blanco con boniato y calabacín", "Crema de verduras + tortilla francesa", "Pollo salteado con noodles integrales y verduras"], snacks: ["Plátano + dátiles", "Yogur con granola", "Tostada con miel", "Fruta + frutos secos"] },
 };
+// Fotos de plato por tipo de ingrediente principal (Unsplash).
+const FOODIMG = {
+  pescado: "1467003909585-2f8a72700288", pollo: "1604908176997-125f25cc6f3d", carne: "1546964124-0cce460f38ef",
+  huevo: "1482049016688-2d3e1b311543", avena: "1517673400267-0251440c45dc", yogur: "1488477181946-6428a0291777",
+  ensalada: "1512621776951-a57141f2eefd", arroz: "1516684732162-798a0062be99", pasta: "1551183053-bf91a1d81141",
+  legumbre: "1585032226651-759b368d7246", tostada: "1528735602780-2552fd46c7af", batido: "1553530666-ba11a7da3888",
+  fruta: "1490474418585-ba9bad8fd0ea", patata: "1518977676601-b53f82aba655", verdura: "1540420773420-3366772f4999",
+  otro: "1504674900247-0877df9cc836",
+};
+function platoImg(plato) {
+  const p = plato.toLowerCase();
+  const has = (...ks) => ks.some((k) => p.includes(k));
+  let key = "otro";
+  if (has("salmón", "salmon", "merluza", "atún", "atun", "pescado", "bacalao")) key = "pescado";
+  else if (has("pollo", "pavo")) key = "pollo";
+  else if (has("ternera", "hamburguesa", "carne")) key = "carne";
+  else if (has("tortilla", "huevo", "revuelto")) key = "huevo";
+  else if (has("avena", "porridge")) key = "avena";
+  else if (has("yogur")) key = "yogur";
+  else if (has("ensalada")) key = "ensalada";
+  else if (has("pasta", "noodles", "cuscús", "cuscus")) key = "pasta";
+  else if (has("lentejas", "garbanzos")) key = "legumbre";
+  else if (has("tostada", "sándwich", "sandwich", "pan ", "picatostes", "tortitas")) key = "tostada";
+  else if (has("batido")) key = "batido";
+  else if (has("fruta", "plátano", "platano", "dátiles", "datiles", "frutos", "almendras", "nueces", "granola", "manzana")) key = "fruta";
+  else if (has("arroz", "quinoa")) key = "arroz";
+  else if (has("patata", "boniato")) key = "patata";
+  else if (has("crema", "puré", "pure", "verduras", "brócoli", "brocoli", "zanahoria", "hummus", "espárragos", "esparragos", "coliflor")) key = "verdura";
+  return U(FOODIMG[key], 600);
+}
 const SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 function buildDiet(objetivo) {
   const d = DIETAS[objetivo];
@@ -164,7 +227,7 @@ function Hero({ onStart }) {
             onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>CREAR MI PLAN GRATIS →</button>
         </div>
         <div style={{ display: "flex", gap: 48, marginTop: 60, flexWrap: "wrap" }}>
-          {[["4", "objetivos"], ["7 días", "de dieta"], ["16", "ejercicios con foto"]].map(([n, t]) => (
+          {[["4", "objetivos"], ["7 días", "de dieta"], [`${Object.keys(EX).length}`, "ejercicios con foto"]].map(([n, t]) => (
             <div key={t}><div style={{ ...DF, fontSize: 32, fontWeight: 800 }}>{n}</div><div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3 }}>{t}</div></div>
           ))}
         </div>
@@ -412,7 +475,7 @@ function Plan({ datos, onReset }) {
                       <div key={id} className="exwrap" style={{ background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
                         <button onClick={() => setExAbierto(abierto ? null : id)} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
                           <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
-                            <img className="eximg" src={EXIMG[ex.key]} alt={ex.nombre} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
+                            <img className="eximg" src={EXIMG[ex.key]} alt={ex.nombre} loading="lazy" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
                           </div>
                           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", minWidth: 0 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -428,7 +491,7 @@ function Plan({ datos, onReset }) {
                         </button>
                         {abierto && (
                           <div className="fadeUp" style={{ padding: "0 16px 18px", display: "grid", gridTemplateColumns: "minmax(140px,200px) 1fr", gap: 18, alignItems: "start" }}>
-                            <img src={EXIMG[ex.key]} alt={ex.nombre} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
+                            <img src={EXIMG[ex.key]} alt={ex.nombre} onError={onImgError} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
                             <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
                               {ex.pasos.map((p, pi) => (
                                 <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
@@ -465,14 +528,15 @@ function Plan({ datos, onReset }) {
             </div>
             <div style={{ display: "grid", gap: 12 }}>
               {dieta[diaDieta].comidas.map((c, i) => (
-                <div key={c.nombre} className="fadeUp" style={{ animationDelay: `${i * 55}ms`, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 18, padding: "18px 20px", display: "flex", gap: 18, alignItems: "center" }}>
-                  <div style={{ textAlign: "center", flexShrink: 0, width: 58 }}>
-                    <div style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 17 }}>{c.hora}</div>
+                <div key={c.nombre} className="fadeUp" style={{ animationDelay: `${i * 55}ms`, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 18, padding: "14px 16px", display: "flex", gap: 14, alignItems: "center" }}>
+                  <div style={{ textAlign: "center", flexShrink: 0, width: 50 }}>
+                    <div style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15 }}>{c.hora}</div>
                     <div style={{ height: 3, borderRadius: 3, ...grad, marginTop: 6, opacity: .5 }} />
                   </div>
-                  <div>
+                  <img src={platoImg(c.plato)} alt={c.plato} loading="lazy" onError={onImgError} style={{ width: 76, height: 76, borderRadius: 14, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.line}` }} />
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase" }}>{c.nombre}</div>
-                    <div style={{ fontSize: 15.5, fontWeight: 600, marginTop: 4, lineHeight: 1.45 }}>{c.plato}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4, lineHeight: 1.45 }}>{c.plato}</div>
                   </div>
                 </div>
               ))}
