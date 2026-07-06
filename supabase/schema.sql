@@ -24,6 +24,10 @@ drop policy if exists "perfiles_insertar_propio" on public.perfiles;
 create policy "perfiles_insertar_propio" on public.perfiles
   for insert with check (auth.uid() = id);
 
+-- Permisos de tabla para usuarios logueados. Sin esto, la RLS ni siquiera
+-- llega a evaluarse y toda operación falla con "permission denied" (42501).
+grant select, insert, update on public.perfiles to authenticated;
+
 -- Crea automáticamente el perfil cuando alguien se registra.
 create or replace function public.handle_new_user()
 returns trigger
@@ -56,6 +60,10 @@ alter table public.planes enable row level security;
 drop policy if exists "planes_propios" on public.planes;
 create policy "planes_propios" on public.planes
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Permisos de tabla para usuarios logueados (imprescindible además de la RLS;
+-- sin esto el guardado del plan falla siempre con 42501 y la tabla queda vacía).
+grant select, insert, update, delete on public.planes to authenticated;
 
 -- ============================================================
 -- Las Fases 2 (progreso) y 3 (amigos) añadirán las tablas
