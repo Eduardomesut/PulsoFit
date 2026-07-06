@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "PULSO — web de entrenamiento y nutrición con estilo editorial cinematográfico",
+  "description": "PULSO — web de nutrición personalizada con estilo editorial cinematográfico",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

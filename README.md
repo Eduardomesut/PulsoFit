@@ -1,16 +1,17 @@
 # PULSO
 
-**Web de entrenamiento y nutrición** con estilo editorial cinematográfico (inspiración Tesla / Nike). Dile a la app tu objetivo, edad y peso y en segundos genera tu **dieta semanal completa** y tus **entrenamientos personalizados**, con cada ejercicio ilustrado y explicado paso a paso.
+**Web de nutrición personalizada** con estilo editorial cinematográfico (inspiración Tesla / Nike). Dile a la app tu objetivo, tus gustos y tus alergias y en segundos genera tu **semana de comidas completa**, con cada receta ilustrada, sus ingredientes y su modo de elaboración paso a paso.
 
-> Aplicación para gestión de entreno y salud personalizada.
+> Aplicación para gestión de alimentación y salud personalizada.
 
 ## Características
 
-- **4 objetivos**: perder peso, ganar músculo, recomposición y resistencia.
+- **4 objetivos**: perder peso, comer equilibrado, ganar peso y ganar músculo.
 - **Cálculo de calorías y macros** (fórmula Mifflin-St Jeor) según sexo, edad, peso, altura y objetivo.
-- **Entrenamientos a medida**: 2 o 3 días por semana, con series, repeticiones y descansos ajustados a tu nivel (principiante / intermedio / avanzado).
-- **16 ejercicios** con foto y guía paso a paso.
-- **Dieta semanal** de 7 días con 5 comidas diarias.
+- **Preferencias alimentarias**: tipo de dieta (omnívora, vegetariana, vegana, sin gluten, sin lactosa), alimentos que no te gustan y alergias e intolerancias (exclusión estricta).
+- **3, 4 o 5 comidas al día** con reparto calórico por franja.
+- **50 recetas** con foto, ingredientes con cantidades y modo de elaboración paso a paso.
+- **Dieta semanal** de 7 días adaptada a tus preferencias, exportable a PDF con recetario incluido.
 - Interfaz oscura, animaciones y diseño responsive.
 
 ## Stack

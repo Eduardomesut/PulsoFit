@@ -3,10 +3,10 @@ import { useAuth } from "./auth";
 import { supabase } from "./supabase";
 
 /* ============================================================
-   PULSO — Web de entrenamiento y nutrición, estilo editorial
-   cinematográfico (inspiración Tesla / Nike): banners a
-   pantalla completa con foto real, tipografía grande,
-   sección con imagen por objetivo y foto por ejercicio.
+   PULSO — Web de nutrición personalizada, estilo editorial
+   cinematográfico: banners a pantalla completa con foto real,
+   tipografía grande, foto por objetivo y por receta, y cada
+   plato con ingredientes y modo de elaboración paso a paso.
    Imágenes: Unsplash (fuente libre) vía URL directa.
    ============================================================ */
 
@@ -23,102 +23,7 @@ const U = (id, w = 1600) => `https://images.unsplash.com/photo-${id}?auto=format
 const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#FF4D2E'/><stop offset='1' stop-color='#FF9A3C'/></linearGradient></defs><rect width='400' height='400' fill='#1A1D22'/><circle cx='200' cy='210' r='78' fill='url(#g)' opacity='0.28'/><circle cx='200' cy='210' r='40' fill='url(#g)' opacity='0.5'/></svg>`)}`;
 const onImgError = (e) => { const t = e.currentTarget; if (t.src !== FALLBACK_IMG) t.src = FALLBACK_IMG; };
 
-const EXIMG = {
-  // Peso libre / cuerpo
-  sentadilla: U("1574680096145-d05b474e2155", 800), flexiones: U("1598971639058-fab3c3109a00", 800),
-  pesoMuerto: U("1517963879433-6ad2b056d712", 800), remo: U("1534368420009-621bfab424a8", 800),
-  press: U("1583454110551-21f2fa2afe61", 800), zancada: U("1434608519344-49d77a699e1d", 800),
-  plancha: U("1566241142559-40e1dab266c6", 800), burpee: U("1601422407692-ec4eeec1d9b3", 800),
-  escalador: U("1434682881908-b43d0467b798", 800), curl: U("1581009146145-b5ef050c2e1e", 800),
-  pressBanca: U("1534438327276-14e5300c3a48", 800), jalon: U("1598575468023-4a4a1e40d1c9", 800),
-  hipThrust: U("1517836357463-d25dfeac3438", 800), correr: U("1571008887538-b36bb32f4571", 800),
-  jumping: U("1518611012118-696072aa579a", 800), laterales: U("1541534741688-6078c6bfb5c5", 800),
-  // Máquinas de gimnasio
-  prensa: U("1534258936925-c58bed479fcb", 800), extCuadriceps: U("1584863231364-2edc166de576", 800),
-  curlFemoral: U("1596357395217-80de13130e92", 800), aductores: U("1518310383802-640c2de311b2", 800),
-  abductores: U("1517344884509-a0c97ec11bcc", 800), gemelos: U("1550345332-09e3ac987658", 800),
-  pressPecho: U("1591741535018-d042766c62eb", 800), contractora: U("1581122584612-713f89daa8eb", 800),
-  remoPolea: U("1526506118085-60ce8714f8c5", 800), pressHombro: U("1532029837206-abbe2b7620e3", 800),
-  tricepsPolea: U("1605296867304-46d5465a13f1", 800), curlPolea: U("1574680178050-55c6a6a96e0a", 800),
-  abdominalMaquina: U("1571019614242-c5c5dee9f50b", 800), gluteoPolea: U("1594381898411-846e7d193883", 800),
-  bici: U("1534787238916-9ba6764efd4f", 800), eliptica: U("1540497077202-7c8a3999166f", 800),
-  remoErgometro: U("1519505907962-0a6cb0167c73", 800),
-};
-
-const EX = {
-  sentadilla: { nombre: "Sentadilla", musculo: "Piernas · Glúteo", pasos: ["Pies a la anchura de los hombros, puntas ligeramente hacia fuera.", "Baja empujando la cadera atrás, como si te sentaras en una silla.", "Rodillas siguiendo la dirección de los pies, espalda recta.", "Baja hasta que el muslo quede paralelo al suelo y sube empujando con los talones."] },
-  flexiones: { nombre: "Flexiones", musculo: "Pecho · Tríceps", pasos: ["Manos algo más abiertas que los hombros, cuerpo en línea recta.", "Aprieta abdomen y glúteo para no arquear la lumbar.", "Baja el pecho hasta casi tocar el suelo, codos a 45°.", "Empuja con fuerza para volver arriba. Principiante: apoya rodillas."] },
-  pesoMuerto: { nombre: "Peso muerto rumano", musculo: "Femoral · Glúteo", pasos: ["De pie con barra o mancuernas frente a los muslos.", "Baja el peso pegado a las piernas empujando la cadera atrás.", "Rodillas semiflexionadas y espalda siempre recta.", "Al notar tensión en el femoral, sube apretando el glúteo."] },
-  remo: { nombre: "Remo con mancuerna", musculo: "Espalda · Bíceps", pasos: ["Apoya rodilla y mano en un banco, espalda paralela al suelo.", "Coge la mancuerna con el brazo estirado.", "Tira del codo hacia el techo llevando la mancuerna a la cadera.", "Baja controlando. Cambia de lado al terminar."] },
-  press: { nombre: "Press militar", musculo: "Hombro · Tríceps", pasos: ["De pie, mancuernas a la altura de los hombros, palmas al frente.", "Aprieta el abdomen para no arquear la espalda.", "Empuja el peso arriba hasta estirar los brazos.", "Baja despacio hasta los hombros."] },
-  zancada: { nombre: "Zancadas", musculo: "Piernas · Glúteo", pasos: ["Da un paso largo hacia delante.", "Baja hasta que ambas rodillas formen 90°.", "El torso siempre vertical.", "Empuja con el talón delantero para volver. Alterna piernas."] },
-  plancha: { nombre: "Plancha", musculo: "Core · Abdomen", pasos: ["Apóyate sobre antebrazos y puntas de los pies.", "Cuerpo en línea recta de cabeza a talones.", "Aprieta abdomen y glúteo, no dejes caer la cadera.", "Respira controlado y aguanta el tiempo indicado."] },
-  burpee: { nombre: "Burpees", musculo: "Cuerpo completo", pasos: ["Desde de pie, agáchate y apoya las manos en el suelo.", "Lanza los pies atrás a posición de flexión.", "Haz una flexión (opcional) y recoge los pies de un salto.", "Salta hacia arriba con los brazos extendidos. Repite fluido."] },
-  escalador: { nombre: "Mountain climbers", musculo: "Core · Cardio", pasos: ["Posición de flexión con brazos estirados.", "Lleva una rodilla al pecho y vuelve.", "Alterna piernas rápido, como corriendo en el sitio.", "Mantén la cadera baja y el abdomen firme."] },
-  curl: { nombre: "Curl de bíceps", musculo: "Bíceps", pasos: ["De pie, mancuernas a los lados, palmas al frente.", "Sube doblando solo el codo, sin balancearte.", "Aprieta el bíceps arriba un segundo.", "Baja lento y controlado."] },
-  pressBanca: { nombre: "Press de banca", musculo: "Pecho · Tríceps", pasos: ["Túmbate con los pies firmes en el suelo.", "Agarre algo más abierto que los hombros.", "Baja la barra controlada a la mitad del pecho.", "Empuja arriba sin bloquear los codos."] },
-  jalon: { nombre: "Jalón / Dominadas", musculo: "Espalda · Bíceps", pasos: ["Agarre más abierto que los hombros.", "Saca pecho y tira hacia la parte alta del pecho.", "Lleva los codos hacia abajo y atrás.", "Sube controlando. Si dominas el jalón, prueba dominadas."] },
-  hipThrust: { nombre: "Hip thrust", musculo: "Glúteo · Femoral", pasos: ["Espalda alta apoyada en un banco, peso sobre la cadera.", "Pies firmes, rodillas a 90°.", "Empuja la cadera arriba apretando el glúteo.", "Arriba, cuerpo en línea recta. Baja controlado."] },
-  correr: { nombre: "Carrera por intervalos", musculo: "Cardio", pasos: ["Calienta 5 min trotando suave.", "Alterna 1 min rápido con 2 min suaves.", "Repite el ciclo el tiempo indicado.", "Termina con 5 min de trote suave y estiramientos."] },
-  jumping: { nombre: "Jumping jacks", musculo: "Cardio", pasos: ["De pie, brazos a los lados y pies juntos.", "Salta abriendo piernas y subiendo los brazos.", "Vuelve a la posición inicial con otro salto.", "Ritmo constante, aterriza suave."] },
-  laterales: { nombre: "Elevaciones laterales", musculo: "Hombro", pasos: ["De pie, mancuernas ligeras a los lados.", "Sube los brazos a los lados hasta la altura del hombro.", "Codos ligeramente flexionados, sin balancearte.", "Baja lento resistiendo el peso."] },
-  // --- Máquinas de gimnasio ---
-  prensa: { nombre: "Prensa de piernas (máquina)", musculo: "Cuádriceps · Glúteo", pasos: ["Siéntate con la espalda y la cadera bien apoyadas en el respaldo.", "Coloca los pies en la plataforma a la anchura de los hombros.", "Quita los seguros y baja flexionando las rodillas hasta unos 90°.", "Empuja con toda la planta del pie sin bloquear del todo las rodillas arriba."] },
-  extCuadriceps: { nombre: "Extensión de cuádriceps (máquina)", musculo: "Cuádriceps", pasos: ["Ajusta el respaldo para que las rodillas queden alineadas con el eje de giro.", "Coloca el rodillo sobre la parte baja de las espinillas.", "Estira las piernas subiendo el peso hasta casi bloquear la rodilla.", "Aprieta el cuádriceps arriba y baja lento y controlado."] },
-  curlFemoral: { nombre: "Curl femoral (máquina)", musculo: "Femoral", pasos: ["Túmbate o siéntate según el modelo, rodillas alineadas con el eje.", "El rodillo apoyado justo encima del talón (tendón de Aquiles).", "Flexiona llevando el talón hacia el glúteo.", "Aprieta el femoral en el punto máximo y baja controlando."] },
-  aductores: { nombre: "Máquina de aductores", musculo: "Aductores (cara interna)", pasos: ["Siéntate con la espalda apoyada y las piernas abiertas sobre los apoyos.", "Ajusta la amplitud de apertura a una que sea cómoda.", "Junta las piernas apretando la cara interna de los muslos.", "Vuelve despacio a la apertura inicial sin soltar de golpe."] },
-  abductores: { nombre: "Máquina de abductores", musculo: "Glúteo medio", pasos: ["Siéntate con la espalda apoyada y las piernas juntas sobre los apoyos.", "Empuja hacia fuera abriendo las piernas todo lo que permita el rango.", "Aprieta los glúteos en la máxima apertura un segundo.", "Cierra despacio resistiendo el peso."] },
-  gemelos: { nombre: "Elevación de gemelos (máquina)", musculo: "Gemelos", pasos: ["Coloca las puntas de los pies en el borde de la plataforma, talones al aire.", "Apoya los hombros bajo las almohadillas (o el peso según el modelo).", "Sube empujando con las puntas lo más alto posible.", "Baja el talón por debajo del escalón para estirar y repite."] },
-  pressPecho: { nombre: "Press de pecho (máquina)", musculo: "Pecho · Tríceps", pasos: ["Ajusta el asiento para que las manetas queden a la altura del pecho.", "Espalda apoyada, escápulas juntas y pies firmes en el suelo.", "Empuja las manetas al frente hasta casi estirar los brazos.", "Vuelve controlando hasta notar estiramiento en el pecho."] },
-  contractora: { nombre: "Contractora / Peck deck", musculo: "Pecho", pasos: ["Ajusta el asiento para que los brazos queden paralelos al suelo.", "Antebrazos apoyados en las almohadillas, codos a la altura del hombro.", "Junta las almohadillas al frente apretando el pecho.", "Abre despacio sin dejar que el peso tire de más de la cuenta."] },
-  remoPolea: { nombre: "Remo en polea baja", musculo: "Espalda · Bíceps", pasos: ["Siéntate con rodillas semiflexionadas y agarra el triángulo o la barra.", "Espalda recta y pecho arriba, brazos estirados al inicio.", "Tira llevando los codos atrás y pegados al cuerpo hasta el abdomen.", "Aprieta la espalda un instante y vuelve estirando sin encorvarte."] },
-  pressHombro: { nombre: "Press de hombro (máquina)", musculo: "Hombro · Tríceps", pasos: ["Ajusta el asiento para que las manetas queden a la altura de los hombros.", "Espalda bien apoyada en el respaldo.", "Empuja hacia arriba hasta casi estirar los brazos, sin bloquear.", "Baja controlando hasta la altura de las orejas."] },
-  tricepsPolea: { nombre: "Extensión de tríceps en polea", musculo: "Tríceps", pasos: ["De pie frente a la polea alta con barra o cuerda.", "Codos pegados al cuerpo y fijos durante todo el movimiento.", "Estira los brazos hacia abajo hasta bloquear el codo.", "Sube controlando solo hasta que el antebrazo quede horizontal."] },
-  curlPolea: { nombre: "Curl de bíceps en polea", musculo: "Bíceps", pasos: ["De pie frente a la polea baja con barra o cuerda.", "Codos pegados a los costados y fijos.", "Flexiona subiendo el agarre hacia los hombros.", "Aprieta el bíceps arriba y baja lento resistiendo."] },
-  abdominalMaquina: { nombre: "Máquina de abdominales", musculo: "Core · Abdomen", pasos: ["Ajusta el asiento y agarra las manetas o el apoyo del pecho.", "Contrae el abdomen llevando el pecho hacia las caderas (encógete).", "El movimiento nace del abdomen, no de tirar con los brazos.", "Vuelve despacio sin soltar la tensión del core."] },
-  gluteoPolea: { nombre: "Patada de glúteo en polea", musculo: "Glúteo", pasos: ["Coloca la cincha en el tobillo, de frente a la polea baja.", "Sujétate a la estructura y mantén el tronco ligeramente inclinado.", "Lleva la pierna hacia atrás estirada apretando el glúteo.", "Vuelve controlando sin arquear la zona lumbar. Cambia de pierna."] },
-  bici: { nombre: "Bicicleta estática", musculo: "Cardio", pasos: ["Ajusta la altura del sillín: rodilla casi estirada abajo.", "Empieza con 3-4 min a ritmo suave para calentar.", "Mantén una cadencia constante con una resistencia media.", "Puedes alternar 1 min fuerte / 2 min suave si buscas intervalos."] },
-  eliptica: { nombre: "Elíptica", musculo: "Cardio", pasos: ["Súbete con los pies en los pedales y agarra los manillares móviles.", "Mantén el tronco erguido y el abdomen activo.", "Empuja con piernas y brazos a un ritmo fluido y constante.", "Ajusta la resistencia para mantener una intensidad media-alta."] },
-  remoErgometro: { nombre: "Remo en máquina (remo-ergómetro)", musculo: "Cardio · Espalda", pasos: ["Sujeta los pies con las cinchas y agarra la barra con los brazos estirados.", "Empuja primero con las piernas, luego inclina el tronco y tira con los brazos.", "Termina con la barra bajo el pecho y los codos atrás.", "Vuelve en orden inverso: brazos, tronco y por último piernas."] },
-};
-
-function seriesReps(objetivo, nivel, ex) {
-  const cardioMin = ["correr", "bici", "eliptica", "remoErgometro"].includes(ex);
-  const cardioHIIT = ["burpee", "escalador", "jumping"].includes(ex);
-  if (cardioMin) return { series: "1", reps: nivel === "principiante" ? "12 min" : nivel === "intermedio" ? "18 min" : "22 min", descanso: "—" };
-  if (ex === "plancha") return { series: nivel === "principiante" ? "3" : "4", reps: nivel === "principiante" ? "30 seg" : nivel === "intermedio" ? "45 seg" : "60 seg", descanso: "45 seg" };
-  if (cardioHIIT) return { series: nivel === "principiante" ? "3" : "4", reps: nivel === "principiante" ? "30 seg" : "40 seg", descanso: "30 seg" };
-  if (objetivo === "ganar") return nivel === "principiante" ? { series: "3", reps: "8–10", descanso: "90 seg" } : nivel === "intermedio" ? { series: "4", reps: "8–10", descanso: "90 seg" } : { series: "4", reps: "6–8", descanso: "2 min" };
-  if (objetivo === "perder") return { series: nivel === "principiante" ? "3" : "4", reps: "12–15", descanso: "45 seg" };
-  if (objetivo === "resistencia") return { series: "3", reps: "15–20", descanso: "30 seg" };
-  return { series: nivel === "principiante" ? "3" : "4", reps: "10–12", descanso: "60 seg" };
-}
-
-function buildWorkout(objetivo, nivel, dias) {
-  const d3 = dias === 3;
-  let plan;
-  if (objetivo === "ganar") plan = d3
-    ? [{ titulo: "Día 1 · Empuje", foco: "Pecho, hombro y tríceps", lista: ["pressBanca", "pressPecho", "pressHombro", "contractora", "laterales", "tricepsPolea"] }, { titulo: "Día 2 · Tirón", foco: "Espalda y bíceps", lista: ["jalon", "remoPolea", "remo", "pesoMuerto", "curl", "curlPolea"] }, { titulo: "Día 3 · Pierna", foco: "Piernas, glúteo y core", lista: ["sentadilla", "prensa", "extCuadriceps", "curlFemoral", "hipThrust", "gemelos", "abdominalMaquina"] }]
-    : [{ titulo: "Día 1 · Torso", foco: "Pecho, espalda y hombro", lista: ["pressBanca", "pressPecho", "jalon", "remoPolea", "pressHombro", "curl", "tricepsPolea"] }, { titulo: "Día 2 · Pierna y core", foco: "Piernas, glúteo y abdomen", lista: ["sentadilla", "prensa", "extCuadriceps", "curlFemoral", "hipThrust", "gemelos", "plancha"] }];
-  else if (objetivo === "perder") plan = d3
-    ? [{ titulo: "Día 1 · Full body A", foco: "Fuerza + quema", lista: ["sentadilla", "prensa", "pressPecho", "remoPolea", "abdominalMaquina", "plancha"] }, { titulo: "Día 2 · Cardio máquinas + HIIT", foco: "Máxima quema calórica", lista: ["bici", "eliptica", "remoErgometro", "burpee", "escalador"] }, { titulo: "Día 3 · Full body B", foco: "Fuerza + quema", lista: ["pesoMuerto", "pressHombro", "jalon", "hipThrust", "gluteoPolea", "plancha"] }]
-    : [{ titulo: "Día 1 · Full body + cardio", foco: "Fuerza + quema", lista: ["sentadilla", "prensa", "pressPecho", "remoPolea", "bici", "plancha"] }, { titulo: "Día 2 · Full body + cardio", foco: "Fuerza + cardio", lista: ["pesoMuerto", "pressHombro", "jalon", "hipThrust", "eliptica", "escalador"] }];
-  else if (objetivo === "resistencia") plan = d3
-    ? [{ titulo: "Día 1 · Circuito metabólico", foco: "Resistencia muscular", lista: ["prensa", "pressPecho", "remoPolea", "zancada", "abdominalMaquina", "escalador"] }, { titulo: "Día 2 · Cardio máquinas", foco: "Capacidad aeróbica", lista: ["bici", "eliptica", "remoErgometro", "jumping"] }, { titulo: "Día 3 · Circuito total", foco: "Cuerpo completo", lista: ["sentadilla", "jalon", "pressHombro", "curlFemoral", "plancha", "burpee"] }]
-    : [{ titulo: "Día 1 · Circuito total", foco: "Resistencia muscular", lista: ["sentadilla", "pressPecho", "remoPolea", "zancada", "escalador", "plancha"] }, { titulo: "Día 2 · Cardio + core", foco: "Capacidad aeróbica", lista: ["bici", "eliptica", "remoErgometro", "abdominalMaquina", "plancha"] }];
-  else plan = d3
-    ? [{ titulo: "Día 1 · Fuerza torso", foco: "Músculo + tono", lista: ["pressBanca", "pressPecho", "jalon", "remoPolea", "pressHombro", "curl", "tricepsPolea"] }, { titulo: "Día 2 · Fuerza pierna", foco: "Piernas y glúteo", lista: ["sentadilla", "prensa", "extCuadriceps", "curlFemoral", "hipThrust", "gemelos"] }, { titulo: "Día 3 · Metabólico + core", foco: "Quema + core", lista: ["bici", "eliptica", "burpee", "escalador", "abdominalMaquina", "plancha"] }]
-    : [{ titulo: "Día 1 · Fuerza total", foco: "Músculo + tono", lista: ["sentadilla", "prensa", "pressBanca", "remoPolea", "pressHombro", "plancha"] }, { titulo: "Día 2 · Fuerza + quema", foco: "Pierna y cardio", lista: ["pesoMuerto", "prensa", "hipThrust", "jalon", "bici", "escalador"] }];
-  return plan.map((d) => ({ ...d, ejercicios: d.lista.map((k) => ({ key: k, ...EX[k], ...seriesReps(objetivo, nivel, k) })) }));
-}
-
-const DIETAS = {
-  perder: { desayunos: ["Yogur griego natural con frutos rojos y 30 g de avena", "Tortilla de 2 huevos con espinacas + 1 pan integral", "Porridge de avena con manzana y canela", "Tostada integral con tomate, pavo y AOVE"], comidas: ["Pechuga de pollo, arroz integral (60 g) y brócoli", "Merluza al horno con patata cocida pequeña y ensalada", "Lentejas estofadas con verduras (plato mediano)", "Ternera magra salteada con pimientos y quinoa (50 g)"], cenas: ["Salmón a la plancha con espárragos", "Revuelto de huevo, champiñones y calabacín", "Ensalada de atún, huevo duro y ½ aguacate", "Pechuga de pavo con puré de coliflor"], snacks: ["1 fruta + 10 almendras", "Yogur desnatado", "Zanahorias con hummus", "Queso batido 0% con canela"] },
-  ganar: { desayunos: ["Avena (80 g) con leche, plátano y crema de cacahuete", "4 tostadas integrales con aguacate y 3 huevos", "Batido: leche, avena (60 g), plátano y proteína", "Porridge con nueces, miel y yogur griego"], comidas: ["Arroz (100 g) con pollo (200 g) y AOVE", "Pasta integral (110 g) con ternera picada y tomate", "Salmón (200 g) con patata asada grande y verduras", "Garbanzos con arroz, huevo duro y atún"], cenas: ["Tortilla de 3 huevos con patata y ensalada", "Pollo al horno (200 g) con boniato y aguacate", "Atún con arroz (80 g) y pisto de verduras", "Hamburguesa casera de ternera con pan integral y queso"], snacks: ["Batido de proteína + plátano", "Puñado grande de frutos secos", "Yogur griego con miel y granola", "Sándwich integral de pavo y queso"] },
-  ambos: { desayunos: ["Avena (50 g) con yogur griego y frutos rojos", "3 huevos revueltos con pan integral y tomate", "Batido: leche, plátano, avena (40 g) y proteína", "Tostadas integrales con aguacate y huevo poché"], comidas: ["Pollo (180 g) con arroz integral (80 g) y verduras", "Salmón con quinoa (70 g) y espárragos", "Lentejas con arroz y huevo duro", "Ternera magra con patata asada y ensalada"], cenas: ["Merluza al horno con boniato pequeño y brócoli", "Revuelto de 3 huevos con champiñones", "Pechuga de pavo con puré de patata y calabacín", "Ensalada de atún, huevo, aguacate y picatostes"], snacks: ["Yogur griego + nueces", "Fruta + queso fresco", "Batido de proteína", "Tortitas de arroz con crema de cacahuete"] },
-  resistencia: { desayunos: ["Porridge de avena (60 g) con plátano y miel", "Tostadas integrales con mermelada y yogur griego", "Batido: leche, avena, frutos rojos y plátano", "Tortilla de 2 huevos con pan integral y zumo natural"], comidas: ["Pasta integral (90 g) con pollo y tomate", "Arroz (90 g) con salmón y verduras", "Cuscús con garbanzos, pasas y pollo", "Patata asada con atún y ensalada"], cenas: ["Arroz (60 g) con huevo y pisto", "Pescado blanco con boniato y calabacín", "Crema de verduras + tortilla francesa", "Pollo salteado con noodles integrales y verduras"], snacks: ["Plátano + dátiles", "Yogur con granola", "Tostada con miel", "Fruta + frutos secos"] },
-};
-// Fotos de plato por tipo de ingrediente principal (Unsplash).
+// Banco de fotos de plato por tipo de ingrediente principal (Unsplash).
 const FOODIMG = {
   pescado: "1467003909585-2f8a72700288", pollo: "1604908176997-125f25cc6f3d", carne: "1546964124-0cce460f38ef",
   huevo: "1482049016688-2d3e1b311543", avena: "1517673400267-0251440c45dc", yogur: "1488477181946-6428a0291777",
@@ -127,73 +32,469 @@ const FOODIMG = {
   fruta: "1490474418585-ba9bad8fd0ea", patata: "1518977676601-b53f82aba655", verdura: "1540420773420-3366772f4999",
   otro: "1504674900247-0877df9cc836",
 };
-function platoImg(plato) {
-  const p = plato.toLowerCase();
-  const has = (...ks) => ks.some((k) => p.includes(k));
-  let key = "otro";
-  if (has("salmón", "salmon", "merluza", "atún", "atun", "pescado", "bacalao")) key = "pescado";
-  else if (has("pollo", "pavo")) key = "pollo";
-  else if (has("ternera", "hamburguesa", "carne")) key = "carne";
-  else if (has("tortilla", "huevo", "revuelto")) key = "huevo";
-  else if (has("avena", "porridge")) key = "avena";
-  else if (has("yogur")) key = "yogur";
-  else if (has("ensalada")) key = "ensalada";
-  else if (has("pasta", "noodles", "cuscús", "cuscus")) key = "pasta";
-  else if (has("lentejas", "garbanzos")) key = "legumbre";
-  else if (has("tostada", "sándwich", "sandwich", "pan ", "picatostes", "tortitas")) key = "tostada";
-  else if (has("batido")) key = "batido";
-  else if (has("fruta", "plátano", "platano", "dátiles", "datiles", "frutos", "almendras", "nueces", "granola", "manzana")) key = "fruta";
-  else if (has("arroz", "quinoa")) key = "arroz";
-  else if (has("patata", "boniato")) key = "patata";
-  else if (has("crema", "puré", "pure", "verduras", "brócoli", "brocoli", "zanahoria", "hummus", "espárragos", "esparragos", "coliflor")) key = "verdura";
-  return U(FOODIMG[key], 600);
-}
+
+const TIPOS_DIETA = [
+  { id: "omnivora", titulo: "Omnívora", desc: "Como de todo" },
+  { id: "vegetariana", titulo: "Vegetariana", desc: "Sin carne ni pescado" },
+  { id: "vegana", titulo: "Vegana", desc: "Sin ningún producto animal" },
+  { id: "sinGluten", titulo: "Sin gluten", desc: "Celiaquía o sensibilidad al gluten" },
+  { id: "sinLactosa", titulo: "Sin lactosa", desc: "Intolerancia a la lactosa" },
+];
+
+// Alérgenos e intolerancias: exclusión ESTRICTA, nunca se relaja.
+const ALERGENOS = [
+  { id: "frutosSecos", nombre: "Frutos secos" },
+  { id: "marisco", nombre: "Marisco" },
+  { id: "lactosa", nombre: "Lactosa" },
+  { id: "gluten", nombre: "Gluten" },
+  { id: "huevo", nombre: "Huevo" },
+  { id: "pescado", nombre: "Pescado" },
+  { id: "soja", nombre: "Soja" },
+];
+
+// Alimentos "no me gustan": se excluyen si el catálogo da suficiente variedad.
+const ALIMENTOS = [
+  { id: "pollo", nombre: "Pollo / pavo" }, { id: "carneRoja", nombre: "Ternera / cerdo" },
+  { id: "pescadoBlanco", nombre: "Pescado blanco" }, { id: "pescadoAzul", nombre: "Salmón / atún" },
+  { id: "huevo", nombre: "Huevo" }, { id: "lacteos", nombre: "Lácteos" },
+  { id: "avena", nombre: "Avena" }, { id: "arroz", nombre: "Arroz" },
+  { id: "pasta", nombre: "Pasta" }, { id: "legumbres", nombre: "Legumbres" },
+  { id: "patata", nombre: "Patata / boniato" }, { id: "aguacate", nombre: "Aguacate" },
+  { id: "platano", nombre: "Plátano" }, { id: "frutosSecos", nombre: "Frutos secos" },
+  { id: "verdurasCrucif", nombre: "Brócoli / coliflor" },
+];
+
+/* Catálogo de recetas. Cada una lleva imagen, kcal aproximadas por ración,
+   ingredientes con cantidades y modo de elaboración paso a paso.
+   - dietas: etiquetas que cumple ("vegana" cuenta también como vegetariana).
+   - alergenos: ids de ALERGENOS presentes (sin gluten / sin lactosa se derivan de aquí).
+   - contiene: ids de ALIMENTOS, para respetar los "no me gusta".
+   - objetivos: afinidad blanda con el objetivo (ordena el plan, nunca filtra). */
+const RECETAS = [
+  // ---------- DESAYUNOS ----------
+  {
+    id: "gachasArroz", nombre: "Gachas de arroz con manzana y canela", categoria: "desayuno", img: "arroz", kcalAprox: 360,
+    ingredientes: [{ nombre: "Harina de arroz", cantidad: "45 g" }, { nombre: "Bebida de arroz", cantidad: "300 ml" }, { nombre: "Manzana", cantidad: "1 unidad" }, { nombre: "Canela", cantidad: "1 pizca" }],
+    pasos: ["Calienta la bebida de arroz en un cazo a fuego medio.", "Añade la harina de arroz en lluvia y remueve 4-5 minutos hasta que espese.", "Ralla media manzana dentro y corta el resto en dados para decorar.", "Sirve en un bol con la manzana por encima y la canela espolvoreada."],
+    dietas: ["vegana"], alergenos: [], contiene: ["arroz"], objetivos: ["equilibrio", "ganar"],
+  },
+  {
+    id: "porridgePlatano", nombre: "Porridge de avena con plátano y canela", categoria: "desayuno", img: "avena", kcalAprox: 420,
+    ingredientes: [{ nombre: "Copos de avena", cantidad: "60 g" }, { nombre: "Leche", cantidad: "250 ml" }, { nombre: "Plátano", cantidad: "1 unidad" }, { nombre: "Canela", cantidad: "1 pizca" }],
+    pasos: ["Calienta la leche en un cazo a fuego medio sin que llegue a hervir.", "Añade la avena y remueve 4-5 minutos hasta que espese.", "Sirve en un bol y corta el plátano en rodajas por encima.", "Termina con la canela espolvoreada."],
+    dietas: ["vegetariana"], alergenos: ["gluten", "lactosa"], contiene: ["avena", "platano", "lacteos"], objetivos: ["ganar", "musculo", "equilibrio"],
+  },
+  {
+    id: "yogurFrutosRojos", nombre: "Yogur griego con frutos rojos y chía", categoria: "desayuno", img: "yogur", kcalAprox: 320,
+    ingredientes: [{ nombre: "Yogur griego natural", cantidad: "200 g" }, { nombre: "Frutos rojos", cantidad: "100 g" }, { nombre: "Semillas de chía", cantidad: "1 cucharada" }, { nombre: "Miel", cantidad: "1 cucharadita (opcional)" }],
+    pasos: ["Pon el yogur en un bol y remuévelo hasta que quede cremoso.", "Lava los frutos rojos y repártelos por encima.", "Espolvorea las semillas de chía y, si quieres, un hilo de miel.", "Deja reposar 5 minutos para que la chía hidrate un poco."],
+    dietas: ["vegetariana"], alergenos: ["lactosa"], contiene: ["lacteos"], objetivos: ["perder", "equilibrio", "musculo"],
+  },
+  {
+    id: "tortillaEspinacas", nombre: "Tortilla de espinacas con tostada integral", categoria: "desayuno", img: "huevo", kcalAprox: 380,
+    ingredientes: [{ nombre: "Huevos", cantidad: "2 unidades" }, { nombre: "Espinacas frescas", cantidad: "1 puñado" }, { nombre: "Pan integral", cantidad: "1 rebanada" }, { nombre: "Aceite de oliva", cantidad: "1 cucharadita" }],
+    pasos: ["Saltea las espinacas 1 minuto en una sartén con el aceite.", "Bate los huevos con una pizca de sal y viértelos sobre las espinacas.", "Cuaja la tortilla a fuego medio, doblándola por la mitad.", "Tuesta el pan y sírvelo junto a la tortilla."],
+    dietas: ["vegetariana"], alergenos: ["huevo", "gluten"], contiene: ["huevo"], objetivos: ["perder", "musculo"],
+  },
+  {
+    id: "tostadaAguacate", nombre: "Tostada integral con aguacate y tomate", categoria: "desayuno", img: "tostada", kcalAprox: 350,
+    ingredientes: [{ nombre: "Pan integral", cantidad: "2 rebanadas" }, { nombre: "Aguacate", cantidad: "½ unidad" }, { nombre: "Tomate", cantidad: "1 unidad" }, { nombre: "Aceite de oliva y sal", cantidad: "al gusto" }],
+    pasos: ["Tuesta el pan hasta que quede dorado.", "Machaca el aguacate con un tenedor y una pizca de sal.", "Unta el aguacate sobre las tostadas.", "Corta el tomate en rodajas finas, colócalo encima y termina con un hilo de aceite."],
+    dietas: ["vegana"], alergenos: ["gluten"], contiene: ["aguacate"], objetivos: ["equilibrio", "perder"],
+  },
+  {
+    id: "batidoCacahuete", nombre: "Batido de plátano, avena y crema de cacahuete", categoria: "desayuno", img: "batido", kcalAprox: 520,
+    ingredientes: [{ nombre: "Leche", cantidad: "250 ml" }, { nombre: "Plátano", cantidad: "1 unidad" }, { nombre: "Copos de avena", cantidad: "40 g" }, { nombre: "Crema de cacahuete", cantidad: "1 cucharada" }],
+    pasos: ["Pela el plátano y trocéalo.", "Pon todos los ingredientes en la batidora.", "Bate 1 minuto hasta que quede homogéneo y sin grumos.", "Sirve frío; puedes añadir hielo antes de batir."],
+    dietas: ["vegetariana"], alergenos: ["gluten", "lactosa", "frutosSecos"], contiene: ["avena", "platano", "lacteos", "frutosSecos"], objetivos: ["ganar", "musculo"],
+  },
+  {
+    id: "revueltoChampinones", nombre: "Revuelto de huevos con champiñones", categoria: "desayuno", img: "huevo", kcalAprox: 300,
+    ingredientes: [{ nombre: "Huevos", cantidad: "3 unidades" }, { nombre: "Champiñones", cantidad: "100 g" }, { nombre: "Cebollino", cantidad: "al gusto" }, { nombre: "Aceite de oliva", cantidad: "1 cucharadita" }],
+    pasos: ["Lamina los champiñones y saltéalos 3-4 minutos hasta dorarlos.", "Bate los huevos con sal y viértelos en la sartén.", "Remueve a fuego suave hasta que cuajen sin secarse.", "Sirve con el cebollino picado por encima."],
+    dietas: ["vegetariana"], alergenos: ["huevo"], contiene: ["huevo"], objetivos: ["perder", "musculo"],
+  },
+  {
+    id: "bolFrutas", nombre: "Bol de frutas frescas con coco rallado", categoria: "desayuno", img: "fruta", kcalAprox: 250,
+    ingredientes: [{ nombre: "Manzana", cantidad: "1 unidad" }, { nombre: "Naranja", cantidad: "1 unidad" }, { nombre: "Kiwi", cantidad: "1 unidad" }, { nombre: "Coco rallado", cantidad: "1 cucharada" }],
+    pasos: ["Lava y pela las frutas.", "Córtalas en dados del mismo tamaño.", "Mézclalas en un bol con el zumo que suelte la naranja.", "Espolvorea el coco rallado justo antes de servir."],
+    dietas: ["vegana"], alergenos: [], contiene: [], objetivos: ["perder", "equilibrio"],
+  },
+  {
+    id: "tostadaPavo", nombre: "Tostada integral con pavo y tomate", categoria: "desayuno", img: "tostada", kcalAprox: 340,
+    ingredientes: [{ nombre: "Pan integral", cantidad: "2 rebanadas" }, { nombre: "Fiambre de pavo", cantidad: "80 g" }, { nombre: "Tomate rallado", cantidad: "1 unidad" }, { nombre: "Aceite de oliva", cantidad: "1 cucharadita" }],
+    pasos: ["Tuesta el pan hasta que quede crujiente.", "Ralla el tomate y mézclalo con el aceite y una pizca de sal.", "Reparte el tomate sobre las tostadas.", "Termina colocando el pavo por encima."],
+    dietas: [], alergenos: ["gluten"], contiene: ["pollo"], objetivos: ["perder", "musculo"],
+  },
+  {
+    id: "pudinChia", nombre: "Pudin de chía con bebida de coco y mango", categoria: "desayuno", img: "fruta", kcalAprox: 330,
+    ingredientes: [{ nombre: "Semillas de chía", cantidad: "25 g" }, { nombre: "Bebida de coco", cantidad: "200 ml" }, { nombre: "Mango", cantidad: "½ unidad" }],
+    pasos: ["Mezcla la chía con la bebida de coco en un vaso o bol.", "Remueve, espera 10 minutos y vuelve a remover para que no se apelmace.", "Deja reposar en la nevera al menos 2 horas (o toda la noche).", "Sirve con el mango en dados por encima."],
+    dietas: ["vegana"], alergenos: [], contiene: [], objetivos: ["equilibrio", "perder"],
+  },
+  {
+    id: "tortitasAvena", nombre: "Tortitas de avena y plátano", categoria: "desayuno", img: "avena", kcalAprox: 450,
+    ingredientes: [{ nombre: "Copos de avena", cantidad: "60 g" }, { nombre: "Huevos", cantidad: "2 unidades" }, { nombre: "Plátano", cantidad: "1 unidad" }, { nombre: "Canela", cantidad: "1 pizca" }],
+    pasos: ["Tritura la avena, los huevos, el plátano y la canela hasta obtener una masa.", "Calienta una sartén antiadherente con unas gotas de aceite.", "Vierte pequeñas porciones y cocina 2 minutos por lado.", "Sirve en torre con fruta o un hilo de miel si quieres."],
+    dietas: ["vegetariana"], alergenos: ["gluten", "huevo"], contiene: ["avena", "huevo", "platano"], objetivos: ["ganar", "musculo"],
+  },
+  {
+    id: "tostadaMaizHummus", nombre: "Tortitas de maíz con hummus y pepino", categoria: "desayuno", img: "tostada", kcalAprox: 300,
+    ingredientes: [{ nombre: "Tortitas de maíz", cantidad: "3 unidades" }, { nombre: "Hummus", cantidad: "60 g" }, { nombre: "Pepino", cantidad: "½ unidad" }, { nombre: "Pimentón", cantidad: "1 pizca" }],
+    pasos: ["Unta cada tortita de maíz con una capa generosa de hummus.", "Corta el pepino en rodajas finas.", "Reparte el pepino sobre el hummus.", "Espolvorea el pimentón antes de servir."],
+    dietas: ["vegana"], alergenos: [], contiene: ["legumbres"], objetivos: ["equilibrio", "perder"],
+  },
+  // ---------- COMIDAS ----------
+  {
+    id: "polloArrozBrocoli", nombre: "Pollo a la plancha con arroz integral y brócoli", categoria: "comida", img: "pollo", kcalAprox: 550,
+    ingredientes: [{ nombre: "Pechuga de pollo", cantidad: "180 g" }, { nombre: "Arroz integral", cantidad: "80 g (en seco)" }, { nombre: "Brócoli", cantidad: "150 g" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Cuece el arroz integral según el tiempo del paquete (35-40 min).", "Cuece el brócoli al vapor 5-6 minutos: debe quedar verde y firme.", "Haz el pollo a la plancha 4-5 minutos por lado con sal y pimienta.", "Monta el plato y aliña con el aceite de oliva en crudo."],
+    dietas: [], alergenos: [], contiene: ["pollo", "arroz", "verdurasCrucif"], objetivos: ["musculo", "perder"],
+  },
+  {
+    id: "merluzaPatatas", nombre: "Merluza al horno con patatas panadera", categoria: "comida", img: "pescado", kcalAprox: 480,
+    ingredientes: [{ nombre: "Lomo de merluza", cantidad: "200 g" }, { nombre: "Patata", cantidad: "200 g" }, { nombre: "Pimiento verde", cantidad: "½ unidad" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Corta la patata en rodajas finas y el pimiento en tiras.", "Hornéalos 20 minutos a 190 °C con el aceite y sal.", "Coloca la merluza encima y hornea 10-12 minutos más.", "Sirve regando el pescado con el jugo de la bandeja."],
+    dietas: [], alergenos: ["pescado"], contiene: ["pescadoBlanco", "patata"], objetivos: ["perder", "equilibrio"],
+  },
+  {
+    id: "lentejasEstofadas", nombre: "Lentejas estofadas con verduras", categoria: "comida", img: "legumbre", kcalAprox: 520,
+    ingredientes: [{ nombre: "Lentejas secas", cantidad: "80 g" }, { nombre: "Zanahoria", cantidad: "1 unidad" }, { nombre: "Cebolla", cantidad: "½ unidad" }, { nombre: "Patata", cantidad: "1 pequeña" }, { nombre: "Pimentón", cantidad: "1 cucharadita" }],
+    pasos: ["Sofríe la cebolla y la zanahoria picadas 5 minutos.", "Añade el pimentón, remueve y agrega las lentejas y la patata en dados.", "Cubre con agua y cuece a fuego suave 35-40 minutos.", "Rectifica de sal y deja reposar 5 minutos antes de servir."],
+    dietas: ["vegana"], alergenos: [], contiene: ["legumbres", "patata"], objetivos: ["equilibrio", "perder"],
+  },
+  {
+    id: "pastaBolonesa", nombre: "Pasta integral con boloñesa de ternera", categoria: "comida", img: "pasta", kcalAprox: 650,
+    ingredientes: [{ nombre: "Pasta integral", cantidad: "100 g (en seco)" }, { nombre: "Ternera picada magra", cantidad: "150 g" }, { nombre: "Tomate triturado", cantidad: "200 g" }, { nombre: "Cebolla", cantidad: "½ unidad" }],
+    pasos: ["Sofríe la cebolla picada hasta que esté transparente.", "Añade la carne y dórala deshaciéndola con la cuchara.", "Incorpora el tomate y cocina 10 minutos a fuego suave.", "Cuece la pasta al dente, escúrrela y mézclala con la salsa."],
+    dietas: [], alergenos: ["gluten"], contiene: ["pasta", "carneRoja"], objetivos: ["ganar", "musculo"],
+  },
+  {
+    id: "salteadoQuinoa", nombre: "Salteado de quinoa con verduras", categoria: "comida", img: "verdura", kcalAprox: 450,
+    ingredientes: [{ nombre: "Quinoa", cantidad: "80 g (en seco)" }, { nombre: "Calabacín", cantidad: "½ unidad" }, { nombre: "Pimiento rojo", cantidad: "½ unidad" }, { nombre: "Zanahoria", cantidad: "1 unidad" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Lava la quinoa y cuécela 15 minutos; escúrrela bien.", "Corta las verduras en dados pequeños.", "Saltéalas 6-7 minutos a fuego vivo: deben quedar al dente.", "Añade la quinoa, saltea 2 minutos más y ajusta de sal."],
+    dietas: ["vegana"], alergenos: [], contiene: [], objetivos: ["equilibrio", "perder"],
+  },
+  {
+    id: "salmonQuinoa", nombre: "Salmón al horno con quinoa y espárragos", categoria: "comida", img: "pescado", kcalAprox: 580,
+    ingredientes: [{ nombre: "Lomo de salmón", cantidad: "180 g" }, { nombre: "Quinoa", cantidad: "70 g (en seco)" }, { nombre: "Espárragos verdes", cantidad: "6 unidades" }, { nombre: "Limón", cantidad: "½ unidad" }],
+    pasos: ["Cuece la quinoa 15 minutos y escúrrela.", "Hornea el salmón y los espárragos 12-14 minutos a 200 °C.", "Exprime el limón sobre el salmón al sacarlo.", "Sirve todo junto con una pizca de sal en los espárragos."],
+    dietas: [], alergenos: ["pescado"], contiene: ["pescadoAzul"], objetivos: ["musculo", "equilibrio"],
+  },
+  {
+    id: "garbanzosEspinacas", nombre: "Garbanzos salteados con espinacas", categoria: "comida", img: "legumbre", kcalAprox: 490,
+    ingredientes: [{ nombre: "Garbanzos cocidos", cantidad: "200 g" }, { nombre: "Espinacas frescas", cantidad: "2 puñados" }, { nombre: "Ajo", cantidad: "2 dientes" }, { nombre: "Pimentón", cantidad: "1 cucharadita" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Dora el ajo laminado en el aceite sin que se queme.", "Añade los garbanzos escurridos y saltéalos 4-5 minutos.", "Incorpora las espinacas hasta que reduzcan.", "Aparta del fuego, añade el pimentón y remueve bien."],
+    dietas: ["vegana"], alergenos: [], contiene: ["legumbres"], objetivos: ["equilibrio", "perder"],
+  },
+  {
+    id: "arrozConPollo", nombre: "Arroz con pollo y pimientos", categoria: "comida", img: "arroz", kcalAprox: 620,
+    ingredientes: [{ nombre: "Arroz", cantidad: "90 g (en seco)" }, { nombre: "Pollo troceado", cantidad: "150 g" }, { nombre: "Pimiento rojo", cantidad: "½ unidad" }, { nombre: "Guisantes", cantidad: "50 g" }, { nombre: "Caldo o agua", cantidad: "250 ml" }],
+    pasos: ["Dora el pollo salpimentado y resérvalo.", "Sofríe el pimiento en la misma sartén 3 minutos.", "Añade el arroz, remueve 1 minuto y cubre con el caldo caliente.", "Incorpora el pollo y los guisantes y cuece 16-18 minutos sin remover."],
+    dietas: [], alergenos: [], contiene: ["arroz", "pollo"], objetivos: ["ganar", "musculo"],
+  },
+  {
+    id: "terneraPatataAsada", nombre: "Ternera magra con patata asada y ensalada", categoria: "comida", img: "carne", kcalAprox: 600,
+    ingredientes: [{ nombre: "Filete de ternera magra", cantidad: "180 g" }, { nombre: "Patata", cantidad: "1 grande" }, { nombre: "Ensalada verde", cantidad: "1 bol" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Asa la patata entera 45 minutos a 200 °C (o 8-10 min en microondas).", "Haz el filete a la plancha muy caliente, 2-3 minutos por lado.", "Deja reposar la carne 2 minutos antes de cortarla.", "Sirve con la patata abierta y la ensalada aliñada."],
+    dietas: [], alergenos: [], contiene: ["carneRoja", "patata"], objetivos: ["musculo", "ganar"],
+  },
+  {
+    id: "ensaladaAtunHuevo", nombre: "Ensalada completa de atún y huevo", categoria: "comida", img: "ensalada", kcalAprox: 420,
+    ingredientes: [{ nombre: "Atún al natural", cantidad: "120 g" }, { nombre: "Huevo duro", cantidad: "1 unidad" }, { nombre: "Lechuga y tomate", cantidad: "1 bol" }, { nombre: "Aceitunas", cantidad: "8 unidades" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Cuece el huevo 10 minutos, enfríalo y pélalo.", "Trocea la lechuga y el tomate en un bol amplio.", "Añade el atún escurrido, el huevo en cuartos y las aceitunas.", "Aliña con aceite, sal y un toque de vinagre."],
+    dietas: [], alergenos: ["pescado", "huevo"], contiene: ["pescadoAzul", "huevo"], objetivos: ["perder"],
+  },
+  {
+    id: "curryGarbanzos", nombre: "Curry de garbanzos con arroz basmati", categoria: "comida", img: "arroz", kcalAprox: 580,
+    ingredientes: [{ nombre: "Garbanzos cocidos", cantidad: "200 g" }, { nombre: "Leche de coco", cantidad: "150 ml" }, { nombre: "Curry en polvo", cantidad: "1 cucharada" }, { nombre: "Arroz basmati", cantidad: "70 g (en seco)" }, { nombre: "Cebolla", cantidad: "½ unidad" }],
+    pasos: ["Cuece el arroz basmati 12 minutos y resérvalo.", "Sofríe la cebolla picada, añade el curry y tuéstalo 30 segundos.", "Incorpora los garbanzos y la leche de coco.", "Cocina 8-10 minutos hasta que la salsa espese y sirve sobre el arroz."],
+    dietas: ["vegana"], alergenos: [], contiene: ["legumbres", "arroz"], objetivos: ["ganar", "equilibrio"],
+  },
+  {
+    id: "pavoBoniato", nombre: "Pechuga de pavo con boniato y judías verdes", categoria: "comida", img: "pollo", kcalAprox: 520,
+    ingredientes: [{ nombre: "Pechuga de pavo", cantidad: "180 g" }, { nombre: "Boniato", cantidad: "200 g" }, { nombre: "Judías verdes", cantidad: "150 g" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Asa el boniato en dados 25 minutos a 200 °C con un hilo de aceite.", "Cuece las judías verdes 6-7 minutos.", "Haz el pavo a la plancha 4 minutos por lado.", "Monta el plato y añade sal y pimienta al gusto."],
+    dietas: [], alergenos: [], contiene: ["pollo", "patata"], objetivos: ["perder", "musculo"],
+  },
+  {
+    id: "pastaPesto", nombre: "Pasta con pesto y tomatitos cherry", categoria: "comida", img: "pasta", kcalAprox: 620,
+    ingredientes: [{ nombre: "Pasta", cantidad: "100 g (en seco)" }, { nombre: "Albahaca fresca", cantidad: "1 manojo" }, { nombre: "Piñones", cantidad: "20 g" }, { nombre: "Parmesano", cantidad: "30 g" }, { nombre: "Tomates cherry", cantidad: "8 unidades" }],
+    pasos: ["Tritura la albahaca, los piñones, el parmesano y aceite hasta obtener el pesto.", "Cuece la pasta al dente y reserva un poco del agua.", "Mezcla la pasta con el pesto, aligerando con el agua reservada.", "Añade los tomatitos partidos por la mitad y sirve."],
+    dietas: ["vegetariana"], alergenos: ["gluten", "lactosa", "frutosSecos"], contiene: ["pasta", "frutosSecos", "lacteos"], objetivos: ["ganar", "equilibrio"],
+  },
+  {
+    id: "wokTofu", nombre: "Wok de tofu y verduras con salsa de soja", categoria: "comida", img: "verdura", kcalAprox: 480,
+    ingredientes: [{ nombre: "Tofu firme", cantidad: "150 g" }, { nombre: "Verduras variadas (pimiento, zanahoria, calabacín)", cantidad: "250 g" }, { nombre: "Salsa de soja", cantidad: "2 cucharadas" }, { nombre: "Sésamo", cantidad: "1 cucharadita" }],
+    pasos: ["Corta el tofu en dados y dóralo en la sartén por todos los lados.", "Retíralo y saltea las verduras en tiras a fuego vivo 5 minutos.", "Devuelve el tofu, añade la salsa de soja y saltea 2 minutos más.", "Sirve con el sésamo espolvoreado."],
+    dietas: ["vegana"], alergenos: ["soja", "gluten"], contiene: [], objetivos: ["musculo", "equilibrio"],
+  },
+  // ---------- CENAS ----------
+  {
+    id: "salmonEsparragos", nombre: "Salmón a la plancha con espárragos", categoria: "cena", img: "pescado", kcalAprox: 450,
+    ingredientes: [{ nombre: "Lomo de salmón", cantidad: "170 g" }, { nombre: "Espárragos verdes", cantidad: "8 unidades" }, { nombre: "Limón", cantidad: "½ unidad" }, { nombre: "Aceite de oliva", cantidad: "1 cucharadita" }],
+    pasos: ["Haz el salmón a la plancha 3-4 minutos por lado, empezando por la piel.", "Saltea los espárragos en la misma plancha con una pizca de sal.", "Exprime el limón por encima al servir.", "Termina con un hilo de aceite de oliva en crudo."],
+    dietas: [], alergenos: ["pescado"], contiene: ["pescadoAzul"], objetivos: ["perder", "musculo"],
+  },
+  {
+    id: "revueltoCalabacin", nombre: "Revuelto de huevo, champiñones y calabacín", categoria: "cena", img: "huevo", kcalAprox: 320,
+    ingredientes: [{ nombre: "Huevos", cantidad: "3 unidades" }, { nombre: "Calabacín", cantidad: "½ unidad" }, { nombre: "Champiñones", cantidad: "100 g" }, { nombre: "Aceite de oliva", cantidad: "1 cucharadita" }],
+    pasos: ["Saltea el calabacín en dados y los champiñones laminados 5 minutos.", "Bate los huevos con una pizca de sal.", "Viértelos sobre las verduras y remueve a fuego suave.", "Retira cuando estén cuajados pero jugosos."],
+    dietas: ["vegetariana"], alergenos: ["huevo"], contiene: ["huevo"], objetivos: ["perder"],
+  },
+  {
+    id: "cremaVerduras", nombre: "Crema de verduras con patata", categoria: "cena", img: "verdura", kcalAprox: 300,
+    ingredientes: [{ nombre: "Calabacín", cantidad: "1 unidad" }, { nombre: "Zanahoria", cantidad: "2 unidades" }, { nombre: "Puerro", cantidad: "1 unidad" }, { nombre: "Patata", cantidad: "1 mediana" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Trocea todas las verduras y la patata.", "Rehógalas 5 minutos con el aceite en una olla.", "Cubre con agua y cuece 20 minutos.", "Tritura hasta que quede fina y ajusta de sal."],
+    dietas: ["vegana"], alergenos: [], contiene: ["patata"], objetivos: ["perder", "equilibrio"],
+  },
+  {
+    id: "pavoPureColiflor", nombre: "Pavo a la plancha con puré de coliflor", categoria: "cena", img: "pollo", kcalAprox: 400,
+    ingredientes: [{ nombre: "Pechuga de pavo", cantidad: "160 g" }, { nombre: "Coliflor", cantidad: "300 g" }, { nombre: "Ajo", cantidad: "1 diente" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Cuece la coliflor 12-15 minutos hasta que esté muy tierna.", "Tritúrala con el aceite, el ajo (dorado antes) y sal: quedará como un puré.", "Haz el pavo a la plancha 4 minutos por lado.", "Sirve el pavo sobre el puré con pimienta recién molida."],
+    dietas: [], alergenos: [], contiene: ["pollo", "verdurasCrucif"], objetivos: ["perder", "musculo"],
+  },
+  {
+    id: "tortillaPatata", nombre: "Tortilla de patata al horno con ensalada", categoria: "cena", img: "huevo", kcalAprox: 480,
+    ingredientes: [{ nombre: "Huevos", cantidad: "3 unidades" }, { nombre: "Patata", cantidad: "200 g" }, { nombre: "Cebolla", cantidad: "½ unidad" }, { nombre: "Ensalada verde", cantidad: "1 bol" }],
+    pasos: ["Corta la patata y la cebolla finas y hornéalas 25 minutos a 190 °C.", "Bate los huevos y mezcla con la patata y cebolla asadas.", "Vierte en un molde y hornea 12-15 minutos hasta cuajar.", "Sirve una porción con la ensalada aliñada."],
+    dietas: ["vegetariana"], alergenos: ["huevo"], contiene: ["huevo", "patata"], objetivos: ["equilibrio", "ganar"],
+  },
+  {
+    id: "ensaladaQuinoaAguacate", nombre: "Ensalada templada de quinoa con aguacate", categoria: "cena", img: "ensalada", kcalAprox: 420,
+    ingredientes: [{ nombre: "Quinoa", cantidad: "60 g (en seco)" }, { nombre: "Aguacate", cantidad: "½ unidad" }, { nombre: "Tomate", cantidad: "1 unidad" }, { nombre: "Pepino", cantidad: "½ unidad" }, { nombre: "Limón", cantidad: "½ unidad" }],
+    pasos: ["Cuece la quinoa 15 minutos y deja que se temple.", "Corta el aguacate, el tomate y el pepino en dados.", "Mezcla todo en un bol grande.", "Aliña con zumo de limón, aceite y sal justo antes de servir."],
+    dietas: ["vegana"], alergenos: [], contiene: ["aguacate"], objetivos: ["equilibrio", "perder"],
+  },
+  {
+    id: "pescadoBlancoVerduras", nombre: "Pescado blanco al horno con verduras", categoria: "cena", img: "pescado", kcalAprox: 380,
+    ingredientes: [{ nombre: "Lubina o merluza", cantidad: "200 g" }, { nombre: "Calabacín", cantidad: "½ unidad" }, { nombre: "Zanahoria", cantidad: "1 unidad" }, { nombre: "Cebolla", cantidad: "½ unidad" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Corta las verduras en juliana y ponlas en una bandeja con el aceite.", "Hornea las verduras 15 minutos a 190 °C.", "Coloca el pescado salpimentado encima.", "Hornea 10-12 minutos más y sirve con el jugo de la bandeja."],
+    dietas: [], alergenos: ["pescado"], contiene: ["pescadoBlanco"], objetivos: ["perder"],
+  },
+  {
+    id: "salteadoPolloArroz", nombre: "Salteado de pollo con arroz y verduras", categoria: "cena", img: "arroz", kcalAprox: 550,
+    ingredientes: [{ nombre: "Pechuga de pollo", cantidad: "150 g" }, { nombre: "Arroz", cantidad: "60 g (en seco)" }, { nombre: "Verduras variadas", cantidad: "200 g" }, { nombre: "Aceite de oliva", cantidad: "1 cucharada" }],
+    pasos: ["Cuece el arroz y resérvalo.", "Saltea el pollo en tiras hasta dorarlo.", "Añade las verduras en juliana y saltea 5 minutos a fuego vivo.", "Incorpora el arroz, mezcla 2 minutos y ajusta de sal."],
+    dietas: [], alergenos: [], contiene: ["pollo", "arroz"], objetivos: ["ganar", "musculo"],
+  },
+  {
+    id: "hamburguesaCasera", nombre: "Hamburguesa casera de ternera con pan integral", categoria: "cena", img: "carne", kcalAprox: 620,
+    ingredientes: [{ nombre: "Ternera picada", cantidad: "150 g" }, { nombre: "Pan integral de hamburguesa", cantidad: "1 unidad" }, { nombre: "Lechuga y tomate", cantidad: "al gusto" }, { nombre: "Cebolla", cantidad: "unas aros" }],
+    pasos: ["Forma la hamburguesa con la carne salpimentada, sin apretarla demasiado.", "Hazla a la plancha 3-4 minutos por lado.", "Tuesta ligeramente el pan en la misma plancha.", "Monta con lechuga, tomate y cebolla."],
+    dietas: [], alergenos: ["gluten"], contiene: ["carneRoja"], objetivos: ["ganar", "musculo"],
+  },
+  {
+    id: "tofuBrocoli", nombre: "Tofu salteado con brócoli y sésamo", categoria: "cena", img: "verdura", kcalAprox: 380,
+    ingredientes: [{ nombre: "Tofu firme", cantidad: "150 g" }, { nombre: "Brócoli", cantidad: "200 g" }, { nombre: "Salsa tamari (sin gluten)", cantidad: "1 cucharada" }, { nombre: "Sésamo", cantidad: "1 cucharadita" }],
+    pasos: ["Corta el tofu en dados y dóralo bien por todos los lados.", "Cuece el brócoli al vapor 4 minutos: debe quedar crujiente.", "Junta tofu y brócoli en la sartén con el tamari.", "Saltea 2 minutos y sirve con el sésamo por encima."],
+    dietas: ["vegana"], alergenos: ["soja"], contiene: ["verdurasCrucif"], objetivos: ["musculo", "perder"],
+  },
+  {
+    id: "pistoArroz", nombre: "Pisto de verduras con arroz", categoria: "cena", img: "verdura", kcalAprox: 350,
+    ingredientes: [{ nombre: "Tomate triturado", cantidad: "200 g" }, { nombre: "Pimiento rojo y verde", cantidad: "½ + ½" }, { nombre: "Calabacín", cantidad: "½ unidad" }, { nombre: "Cebolla", cantidad: "½ unidad" }, { nombre: "Arroz", cantidad: "50 g (en seco)" }],
+    pasos: ["Sofríe la cebolla y los pimientos picados 5 minutos.", "Añade el calabacín en dados y cocina 5 minutos más.", "Incorpora el tomate y deja reducir 15 minutos a fuego suave.", "Cuece el arroz aparte y sírvelo con el pisto por encima."],
+    dietas: ["vegana"], alergenos: [], contiene: ["arroz"], objetivos: ["equilibrio", "perder"],
+  },
+  {
+    id: "espaguetisCalabacin", nombre: "Espaguetis integrales con calabacín y tomate", categoria: "cena", img: "pasta", kcalAprox: 520,
+    ingredientes: [{ nombre: "Espaguetis integrales", cantidad: "90 g (en seco)" }, { nombre: "Calabacín", cantidad: "1 unidad" }, { nombre: "Tomate triturado", cantidad: "200 g" }, { nombre: "Ajo", cantidad: "2 dientes" }],
+    pasos: ["Dora el ajo laminado y añade el calabacín en medias lunas.", "Incorpora el tomate y cocina 10 minutos.", "Cuece los espaguetis al dente.", "Mezcla la pasta con la salsa y sirve con albahaca si tienes."],
+    dietas: ["vegana"], alergenos: ["gluten"], contiene: ["pasta"], objetivos: ["equilibrio", "ganar"],
+  },
+  {
+    id: "bolArrozAlubias", nombre: "Bol de arroz con alubias negras y aguacate", categoria: "cena", img: "arroz", kcalAprox: 560,
+    ingredientes: [{ nombre: "Arroz", cantidad: "70 g (en seco)" }, { nombre: "Alubias negras cocidas", cantidad: "150 g" }, { nombre: "Aguacate", cantidad: "½ unidad" }, { nombre: "Maíz dulce", cantidad: "50 g" }, { nombre: "Lima", cantidad: "½ unidad" }],
+    pasos: ["Cuece el arroz y colócalo como base del bol.", "Calienta las alubias y repártelas encima con el maíz.", "Añade el aguacate laminado.", "Termina con zumo de lima, sal y un toque de comino."],
+    dietas: ["vegana"], alergenos: [], contiene: ["arroz", "legumbres", "aguacate"], objetivos: ["ganar", "equilibrio"],
+  },
+  {
+    id: "fajitasPollo", nombre: "Fajitas de pollo con pimientos", categoria: "cena", img: "pollo", kcalAprox: 540,
+    ingredientes: [{ nombre: "Tortillas de trigo", cantidad: "2 unidades" }, { nombre: "Pechuga de pollo", cantidad: "150 g" }, { nombre: "Pimiento rojo y verde", cantidad: "½ + ½" }, { nombre: "Cebolla", cantidad: "½ unidad" }],
+    pasos: ["Corta el pollo, los pimientos y la cebolla en tiras.", "Saltea el pollo hasta dorarlo y resérvalo.", "Saltea las verduras a fuego vivo 5 minutos y junta con el pollo.", "Calienta las tortillas y rellénalas al momento."],
+    dietas: [], alergenos: ["gluten"], contiene: ["pollo"], objetivos: ["equilibrio", "musculo"],
+  },
+  // ---------- SNACKS ----------
+  {
+    id: "frutaAlmendras", nombre: "Fruta fresca con puñado de almendras", categoria: "snack", img: "fruta", kcalAprox: 200,
+    ingredientes: [{ nombre: "Fruta de temporada", cantidad: "1 pieza" }, { nombre: "Almendras crudas", cantidad: "10 unidades" }],
+    pasos: ["Lava la fruta y córtala si lo prefieres.", "Acompáñala con las almendras.", "Mastica despacio: es un snack que sacia mucho."],
+    dietas: ["vegana"], alergenos: ["frutosSecos"], contiene: ["frutosSecos"], objetivos: ["perder", "equilibrio"],
+  },
+  {
+    id: "yogurCanela", nombre: "Yogur natural con canela", categoria: "snack", img: "yogur", kcalAprox: 130,
+    ingredientes: [{ nombre: "Yogur natural", cantidad: "1 unidad (125 g)" }, { nombre: "Canela", cantidad: "1 pizca" }, { nombre: "Miel", cantidad: "1 cucharadita (opcional)" }],
+    pasos: ["Remueve el yogur hasta que quede cremoso.", "Espolvorea la canela por encima.", "Añade la miel solo si necesitas el toque dulce."],
+    dietas: ["vegetariana"], alergenos: ["lactosa"], contiene: ["lacteos"], objetivos: ["perder"],
+  },
+  {
+    id: "hummusZanahoria", nombre: "Bastones de zanahoria con hummus", categoria: "snack", img: "verdura", kcalAprox: 180,
+    ingredientes: [{ nombre: "Zanahoria", cantidad: "2 unidades" }, { nombre: "Hummus", cantidad: "50 g" }],
+    pasos: ["Pela las zanahorias y córtalas en bastones.", "Sirve el hummus en un cuenco pequeño.", "Moja y disfruta: fibra + proteína vegetal."],
+    dietas: ["vegana"], alergenos: [], contiene: ["legumbres"], objetivos: ["perder", "equilibrio"],
+  },
+  {
+    id: "batidoPlatanoArroz", nombre: "Batido de plátano con bebida de arroz", categoria: "snack", img: "batido", kcalAprox: 250,
+    ingredientes: [{ nombre: "Plátano", cantidad: "1 unidad" }, { nombre: "Bebida de arroz", cantidad: "250 ml" }, { nombre: "Canela", cantidad: "1 pizca" }],
+    pasos: ["Pela y trocea el plátano.", "Bate con la bebida de arroz 1 minuto.", "Sirve frío con la canela por encima."],
+    dietas: ["vegana"], alergenos: [], contiene: ["platano", "arroz"], objetivos: ["ganar", "equilibrio"],
+  },
+  {
+    id: "tortitasCacahuete", nombre: "Tortitas de arroz con crema de cacahuete", categoria: "snack", img: "tostada", kcalAprox: 260,
+    ingredientes: [{ nombre: "Tortitas de arroz", cantidad: "2 unidades" }, { nombre: "Crema de cacahuete", cantidad: "20 g" }],
+    pasos: ["Unta la crema de cacahuete sobre las tortitas.", "Puedes añadir rodajas de plátano por encima.", "Ideal antes o después de actividad física."],
+    dietas: ["vegana"], alergenos: ["frutosSecos"], contiene: ["arroz", "frutosSecos"], objetivos: ["ganar", "musculo"],
+  },
+  {
+    id: "quesoBatidoFrutosRojos", nombre: "Queso batido 0% con frutos rojos", categoria: "snack", img: "yogur", kcalAprox: 150,
+    ingredientes: [{ nombre: "Queso batido 0%", cantidad: "150 g" }, { nombre: "Frutos rojos", cantidad: "80 g" }],
+    pasos: ["Sirve el queso batido en un bol.", "Añade los frutos rojos lavados por encima.", "Un snack muy alto en proteína y muy saciante."],
+    dietas: ["vegetariana"], alergenos: ["lactosa"], contiene: ["lacteos"], objetivos: ["musculo", "perder"],
+  },
+  {
+    id: "macedonia", nombre: "Macedonia de fruta fresca", categoria: "snack", img: "fruta", kcalAprox: 150,
+    ingredientes: [{ nombre: "Naranja", cantidad: "1 unidad" }, { nombre: "Kiwi", cantidad: "1 unidad" }, { nombre: "Fresas", cantidad: "5 unidades" }, { nombre: "Menta", cantidad: "unas hojas (opcional)" }],
+    pasos: ["Pela y trocea toda la fruta en dados.", "Mezcla en un bol con el zumo que suelte la naranja.", "Añade la menta picada y deja enfriar 10 minutos."],
+    dietas: ["vegana"], alergenos: [], contiene: [], objetivos: ["perder", "equilibrio"],
+  },
+  {
+    id: "huevoDuroCherry", nombre: "Huevo duro con tomates cherry", categoria: "snack", img: "huevo", kcalAprox: 160,
+    ingredientes: [{ nombre: "Huevo", cantidad: "1-2 unidades" }, { nombre: "Tomates cherry", cantidad: "6 unidades" }, { nombre: "Sal y aceite de oliva", cantidad: "al gusto" }],
+    pasos: ["Cuece el huevo 10 minutos desde que hierva el agua.", "Enfríalo bajo el grifo y pélalo.", "Sirve en mitades con los cherry, sal y un hilo de aceite."],
+    dietas: ["vegetariana"], alergenos: ["huevo"], contiene: ["huevo"], objetivos: ["perder", "musculo"],
+  },
+  {
+    id: "edamame", nombre: "Edamame al vapor con sal en escamas", categoria: "snack", img: "legumbre", kcalAprox: 180,
+    ingredientes: [{ nombre: "Edamame (con vaina)", cantidad: "100 g" }, { nombre: "Sal en escamas", cantidad: "1 pizca" }],
+    pasos: ["Cuece o haz al vapor el edamame 5 minutos.", "Escúrrelo y sazona con la sal en escamas.", "Cómelo presionando la vaina para sacar las habas."],
+    dietas: ["vegana"], alergenos: ["soja"], contiene: ["legumbres"], objetivos: ["musculo", "perder"],
+  },
+  {
+    id: "cruditesGuacamole", nombre: "Crudités de pepino y pimiento con guacamole", categoria: "snack", img: "verdura", kcalAprox: 170,
+    ingredientes: [{ nombre: "Pepino", cantidad: "½ unidad" }, { nombre: "Pimiento rojo", cantidad: "½ unidad" }, { nombre: "Guacamole", cantidad: "60 g" }],
+    pasos: ["Corta el pepino y el pimiento en bastones.", "Sirve el guacamole en un cuenco.", "Moja los bastones: grasas buenas y muy pocas calorías."],
+    dietas: ["vegana"], alergenos: [], contiene: ["aguacate"], objetivos: ["equilibrio", "perder"],
+  },
+];
+
 const SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-function buildDiet(objetivo) {
-  const d = DIETAS[objetivo];
-  return SEMANA.map((dia, i) => ({ dia, comidas: [
-    { nombre: "Desayuno", plato: d.desayunos[i % d.desayunos.length], hora: "08:00" },
-    { nombre: "Media mañana", plato: d.snacks[i % d.snacks.length], hora: "11:00" },
-    { nombre: "Comida", plato: d.comidas[i % d.comidas.length], hora: "14:00" },
-    { nombre: "Merienda", plato: d.snacks[(i + 2) % d.snacks.length], hora: "17:30" },
-    { nombre: "Cena", plato: d.cenas[i % d.cenas.length], hora: "21:00" },
-  ] }));
+
+// Franjas de comida según el nº de comidas al día, con reparto calórico orientativo.
+const REPARTO = {
+  3: [
+    { nombre: "Desayuno", hora: "08:30", pct: 0.3, cat: "desayuno" },
+    { nombre: "Comida", hora: "14:00", pct: 0.4, cat: "comida" },
+    { nombre: "Cena", hora: "21:00", pct: 0.3, cat: "cena" },
+  ],
+  4: [
+    { nombre: "Desayuno", hora: "08:00", pct: 0.25, cat: "desayuno" },
+    { nombre: "Comida", hora: "14:00", pct: 0.35, cat: "comida" },
+    { nombre: "Merienda", hora: "17:30", pct: 0.15, cat: "snack" },
+    { nombre: "Cena", hora: "21:00", pct: 0.25, cat: "cena" },
+  ],
+  5: [
+    { nombre: "Desayuno", hora: "08:00", pct: 0.25, cat: "desayuno" },
+    { nombre: "Media mañana", hora: "11:00", pct: 0.1, cat: "snack" },
+    { nombre: "Comida", hora: "14:00", pct: 0.3, cat: "comida" },
+    { nombre: "Merienda", hora: "17:30", pct: 0.1, cat: "snack" },
+    { nombre: "Cena", hora: "21:00", pct: 0.25, cat: "cena" },
+  ],
+};
+
+/* Filtra el catálogo según las preferencias del usuario.
+   Alergias y tipo de dieta son ESTRICTOS; los "no me gusta" se relajan
+   si dejan una categoría con menos de 4 recetas (el catálogo garantiza
+   que con solo alergias + dieta siempre quedan al menos 4 por categoría). */
+function filtrarRecetas(datos) {
+  const excluyeAlergeno = (r) => r.alergenos.some((a) =>
+    datos.alergias.includes(a)
+    || (datos.tipoDieta === "sinGluten" && a === "gluten")
+    || (datos.tipoDieta === "sinLactosa" && a === "lactosa"));
+  const cumpleDieta = (r) =>
+    datos.tipoDieta === "vegetariana" ? (r.dietas.includes("vegetariana") || r.dietas.includes("vegana"))
+      : datos.tipoDieta === "vegana" ? r.dietas.includes("vegana")
+        : true;
+  const porCategoria = (cat) => {
+    const base = RECETAS.filter((r) => r.categoria === cat && !excluyeAlergeno(r) && cumpleDieta(r));
+    let pool = base.filter((r) => !r.contiene.some((c) => datos.noGusta.includes(c)));
+    if (pool.length < 4) pool = base; // relaja "no me gusta"; alergias y dieta, nunca
+    // Afinidad con el objetivo: solo reordena (afines primero), no filtra.
+    return [...pool.filter((r) => r.objetivos.includes(datos.objetivo)), ...pool.filter((r) => !r.objetivos.includes(datos.objetivo))];
+  };
+  return { desayuno: porCategoria("desayuno"), comida: porCategoria("comida"), cena: porCategoria("cena"), snack: porCategoria("snack") };
 }
+
+function buildDiet(datos, kcal) {
+  const pools = filtrarRecetas(datos);
+  return SEMANA.map((dia, i) => ({
+    dia,
+    comidas: REPARTO[datos.comidasDia].map((f, j) => {
+      const pool = pools[f.cat];
+      // El desfase por franja (j*2) evita que las dos franjas de snack repitan receta el mismo día.
+      return { nombre: f.nombre, hora: f.hora, kcal: Math.round((kcal * f.pct) / 10) * 10, receta: pool[(i + j * 2) % pool.length] };
+    }),
+  }));
+}
+
 function calcularMetricas({ sexo, edad, peso, altura, objetivo }) {
   const tmb = 10 * peso + 6.25 * altura - 5 * edad + (sexo === "hombre" ? 5 : -161);
   const tdee = tmb * 1.5;
-  const ajuste = objetivo === "perder" ? -450 : objetivo === "ganar" ? 350 : objetivo === "resistencia" ? 150 : 0;
+  const ajuste = objetivo === "perder" ? -450 : objetivo === "ganar" ? 400 : objetivo === "musculo" ? 250 : 0;
   const kcal = Math.round((tdee + ajuste) / 10) * 10;
-  const prot = Math.round(peso * (objetivo === "ganar" ? 2.2 : 2));
+  const prot = Math.round(peso * (objetivo === "musculo" ? 2.2 : objetivo === "perder" ? 2 : 1.8));
   const grasa = Math.round(peso * 0.9);
   const carbs = Math.max(0, Math.round((kcal - prot * 4 - grasa * 9) / 4));
   return { kcal, prot, grasa, carbs };
 }
 
 const OBJETIVOS = [
-  { id: "perder", titulo: "Perder peso", desc: "Quema grasa conservando músculo", img: U("1571019613454-1cb2f99b2d8b") },
-  { id: "ganar", titulo: "Ganar músculo", desc: "Volumen limpio y fuerza", img: U("1581009146145-b5ef050c2e1e") },
-  { id: "ambos", titulo: "Recomposición", desc: "Perder grasa y ganar músculo", img: U("1534438327276-14e5300c3a48") },
-  { id: "resistencia", titulo: "Resistencia", desc: "Más energía y capacidad", img: U("1571008887538-b36bb32f4571") },
+  { id: "perder", titulo: "Perder peso", desc: "Déficit calórico sin pasar hambre", img: U("1512621776951-a57141f2eefd") },
+  { id: "equilibrio", titulo: "Comer equilibrado", desc: "Salud y energía en el día a día", img: U("1490474418585-ba9bad8fd0ea") },
+  { id: "ganar", titulo: "Ganar peso", desc: "Superávit calórico limpio", img: U("1551183053-bf91a1d81141") },
+  { id: "musculo", titulo: "Ganar músculo", desc: "Alta proteína para construir masa", img: U("1467003909585-2f8a72700288") },
 ];
-const HERO_IMG = U("1517838277536-f5f99be501cd");
+const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
+
+/* Migra un plan guardado con el formato antiguo (app con entrenamientos)
+   al formato actual. Los objetivos antiguos se traducen a los nuevos y
+   los campos de fitness (nivel, dias) desaparecen. */
+function migrarDatos(d) {
+  if (!d) return null;
+  const esAntiguo = "nivel" in d || "dias" in d;
+  const idsActuales = OBJETIVOS.map((o) => o.id);
+  const mapaAntiguo = { perder: "perder", ganar: "musculo", ambos: "equilibrio", resistencia: "equilibrio" };
+  const objetivo = esAntiguo ? (mapaAntiguo[d.objetivo] ?? null) : (idsActuales.includes(d.objetivo) ? d.objetivo : null);
+  const { nivel, dias, ...resto } = d;
+  return {
+    sexo: null, edad: 28, peso: 75, altura: 172,
+    ...resto,
+    objetivo,
+    tipoDieta: TIPOS_DIETA.some((t) => t.id === d.tipoDieta) ? d.tipoDieta : "omnivora",
+    alergias: Array.isArray(d.alergias) ? d.alergias : [],
+    noGusta: Array.isArray(d.noGusta) ? d.noGusta : [],
+    comidasDia: [3, 4, 5].includes(d.comidasDia) ? d.comidasDia : 5,
+  };
+}
 
 export default function App() {
   const [fase, setFase] = useState("hero");
   const [paso, setPaso] = useState(0);
-  const [datos, setDatos] = useState({ objetivo: null, sexo: null, edad: 28, peso: 75, altura: 172, nivel: null, dias: 3 });
+  const [datos, setDatos] = useState({ objetivo: null, sexo: null, edad: 28, peso: 75, altura: 172, tipoDieta: "omnivora", alergias: [], noGusta: [], comidasDia: 5 });
   const [authAbierto, setAuthAbierto] = useState(false);
   const [planGuardado, setPlanGuardado] = useState(null);
   const set = (k, v) => setDatos((d) => ({ ...d, [k]: v }));
   const { user } = useAuth();
   useEffect(() => { window.scrollTo(0, 0); }, [fase, paso]);
 
-  // Al iniciar sesión, recupera el último plan guardado del usuario.
+  // Al iniciar sesión, recupera el último plan guardado del usuario (migrándolo si es antiguo).
   useEffect(() => {
     if (!supabase || !user) { setPlanGuardado(null); return; }
     supabase.from("planes").select("datos").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => setPlanGuardado(data?.datos ?? null));
+      .then(({ data }) => {
+        const migrado = migrarDatos(data?.datos ?? null);
+        setPlanGuardado(migrado && migrado.objetivo ? migrado : null);
+      });
   }, [user]);
 
   const retomarPlan = () => { if (planGuardado) { setDatos(planGuardado); setFase("plan"); } };
@@ -215,7 +516,7 @@ export default function App() {
       {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} />}
       {fase === "form" && <Formulario datos={datos} set={set} paso={paso} setPaso={setPaso} onFinish={() => setFase("scan")} onBack={() => setFase("hero")} />}
       {fase === "scan" && <Scan onDone={() => setFase("plan")} />}
-      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null, nivel: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} />}
+      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
   );
@@ -314,9 +615,9 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar }) {
         <CuentaChip onLogin={onLogin} oscuro />
       </header>
       <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 28px 9vh", maxWidth: 1100 }}>
-        <div style={{ fontSize: 13, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 20, fontWeight: 700 }}>Tu plan. Tu cuerpo. Tus reglas.</div>
-        <h1 style={{ ...DF, fontSize: "clamp(46px, 9vw, 118px)", fontWeight: 800, lineHeight: 0.95, margin: 0 }}>Entrena con<br /><span style={gradText}>intención.</span></h1>
-        <p style={{ color: "#D7DADF", fontSize: 18, maxWidth: 540, lineHeight: 1.6, marginTop: 26 }}>Dinos tu objetivo, edad y peso. En segundos generamos tu dieta semanal completa y tus entrenamientos, con cada ejercicio ilustrado y explicado paso a paso.</p>
+        <div style={{ fontSize: 13, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 20, fontWeight: 700 }}>Tu plan. Tu mesa. Tus reglas.</div>
+        <h1 style={{ ...DF, fontSize: "clamp(46px, 9vw, 118px)", fontWeight: 800, lineHeight: 0.95, margin: 0 }}>Come con<br /><span style={gradText}>intención.</span></h1>
+        <p style={{ color: "#D7DADF", fontSize: 18, maxWidth: 540, lineHeight: 1.6, marginTop: 26 }}>Dinos tu objetivo, tus gustos y tus alergias. En segundos generamos tu semana de comidas completa, con cada receta ilustrada, sus ingredientes y su modo de elaboración paso a paso.</p>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
           <button onClick={onStart} style={{ ...grad, marginTop: 34, border: "none", color: "#0A0B0D", fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: "19px 56px", borderRadius: 999, boxShadow: "0 10px 44px rgba(255,77,46,.4)", transition: "transform .15s" }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>CREAR MI PLAN GRATIS →</button>
@@ -325,7 +626,7 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar }) {
           )}
         </div>
         <div style={{ display: "flex", gap: 48, marginTop: 60, flexWrap: "wrap" }}>
-          {[["4", "objetivos"], ["7 días", "de dieta"], [`${Object.keys(EX).length}`, "ejercicios con foto"]].map(([n, t]) => (
+          {[["4", "objetivos"], ["7 días", "de dieta"], [`${RECETAS.length}`, "recetas con foto"]].map(([n, t]) => (
             <div key={t}><div style={{ ...DF, fontSize: 32, fontWeight: 800 }}>{n}</div><div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3 }}>{t}</div></div>
           ))}
         </div>
@@ -335,9 +636,17 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar }) {
 }
 
 function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
-  const pasos = ["Objetivo", "Sobre ti", "Nivel y días"];
-  const puedeSeguir = paso === 0 ? !!datos.objetivo : paso === 1 ? !!datos.sexo : !!datos.nivel;
-  const next = () => (paso < 2 ? setPaso(paso + 1) : onFinish());
+  const pasos = ["Objetivo", "Sobre ti", "Tipo de dieta", "Preferencias", "Comidas al día"];
+  const ultimo = pasos.length - 1;
+  const puedeSeguir = paso === 0 ? !!datos.objetivo : paso === 1 ? !!datos.sexo : true;
+  const next = () => (paso < ultimo ? setPaso(paso + 1) : onFinish());
+  // Alterna un valor dentro de un campo multi-select (alergias, noGusta).
+  const toggle = (k, v) => set(k, datos[k].includes(v) ? datos[k].filter((x) => x !== v) : [...datos[k], v]);
+  const chip = (activo) => ({
+    padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14,
+    border: `1.5px solid ${activo ? C.hot1 : C.line}`, color: activo ? "#0A0B0D" : C.dim,
+    ...(activo ? grad : { background: C.panel }),
+  });
   return (
     <div style={{ minHeight: "100vh", maxWidth: 860, margin: "0 auto", padding: "26px 18px 40px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40 }}>
@@ -355,13 +664,13 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
         {paso === 0 && (
           <>
             <h2 style={{ ...DF, fontSize: "clamp(30px,5vw,46px)", fontWeight: 800, margin: "0 0 8px" }}>¿Cuál es tu objetivo?</h2>
-            <p style={{ color: C.dim, marginBottom: 28 }}>Todo el plan se diseñará alrededor de esto.</p>
+            <p style={{ color: C.dim, marginBottom: 28 }}>Todo el plan de comidas se diseñará alrededor de esto.</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
               {OBJETIVOS.map((o) => {
                 const activo = datos.objetivo === o.id;
                 return (
                   <button key={o.id} onClick={() => set("objetivo", o.id)} style={{ position: "relative", height: 200, borderRadius: 20, overflow: "hidden", border: `2px solid ${activo ? C.hot1 : "transparent"}`, padding: 0, textAlign: "left", boxShadow: activo ? "0 10px 40px rgba(255,77,46,.3)" : "none", transition: "border-color .15s" }}>
-                    <img src={o.img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img src={o.img} alt="" onError={onImgError} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                     <div style={{ position: "absolute", inset: 0, background: activo ? "linear-gradient(180deg, rgba(255,77,46,.25), rgba(10,11,13,.9))" : "linear-gradient(180deg, rgba(10,11,13,.15), rgba(10,11,13,.88))" }} />
                     <div style={{ position: "absolute", left: 20, right: 20, bottom: 18 }}>
                       <div style={{ ...DF, fontWeight: 800, fontSize: 24, color: "#fff" }}>{o.titulo}</div>
@@ -396,39 +705,66 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
         )}
         {paso === 2 && (
           <>
-            <h2 style={{ ...DF, fontSize: "clamp(30px,5vw,46px)", fontWeight: 800, margin: "0 0 8px" }}>Tu experiencia</h2>
-            <p style={{ color: C.dim, marginBottom: 28 }}>Ajustamos series, repeticiones y descansos a tu nivel.</p>
-            <div style={{ display: "grid", gap: 12, marginBottom: 30 }}>
-              {[["principiante", "Principiante", "Desde cero o menos de 6 meses"], ["intermedio", "Intermedio", "Entreno regular desde hace 6 meses – 2 años"], ["avanzado", "Avanzado", "Más de 2 años entrenando en serio"]].map(([id, t, d]) => (
-                <button key={id} onClick={() => set("nivel", id)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.nivel === id ? "linear-gradient(135deg, rgba(255,77,46,.18), rgba(255,154,60,.08))" : C.panel, border: `1.5px solid ${datos.nivel === id ? C.hot1 : C.line}` }}>
-                  <div style={{ ...DF, fontWeight: 800, fontSize: 17 }}>{t}</div>
-                  <div style={{ color: C.dim, fontSize: 13, marginTop: 3 }}>{d}</div>
+            <h2 style={{ ...DF, fontSize: "clamp(30px,5vw,46px)", fontWeight: 800, margin: "0 0 8px" }}>¿Qué tipo de dieta sigues?</h2>
+            <p style={{ color: C.dim, marginBottom: 28 }}>Todas las recetas de tu plan la respetarán.</p>
+            <div style={{ display: "grid", gap: 12 }}>
+              {TIPOS_DIETA.map((t) => (
+                <button key={t.id} onClick={() => set("tipoDieta", t.id)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.tipoDieta === t.id ? "linear-gradient(135deg, rgba(255,77,46,.18), rgba(255,154,60,.08))" : C.panel, border: `1.5px solid ${datos.tipoDieta === t.id ? C.hot1 : C.line}` }}>
+                  <div style={{ ...DF, fontWeight: 800, fontSize: 17 }}>{t.titulo}</div>
+                  <div style={{ color: C.dim, fontSize: 13, marginTop: 3 }}>{t.desc}</div>
                 </button>
               ))}
             </div>
-            <div style={{ fontSize: 13, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Días de entrenamiento por semana</div>
-            <div style={{ display: "flex", gap: 12 }}>
-              {[2, 3].map((n) => (
-                <button key={n} onClick={() => set("dias", n)} style={{ flex: 1, padding: 18, borderRadius: 14, color: C.text, fontWeight: 800, fontSize: 22, background: datos.dias === n ? "linear-gradient(135deg, rgba(255,77,46,.18), rgba(255,154,60,.08))" : C.panel, border: `1.5px solid ${datos.dias === n ? C.hot1 : C.line}`, ...DF }}>{n} <span style={{ fontSize: 13, fontWeight: 400, color: C.dim }}>días</span></button>
+          </>
+        )}
+        {paso === 3 && (
+          <>
+            <h2 style={{ ...DF, fontSize: "clamp(30px,5vw,46px)", fontWeight: 800, margin: "0 0 8px" }}>Tus preferencias</h2>
+            <p style={{ color: C.dim, marginBottom: 28 }}>Marca lo que no quieres ver en tu plan. Puedes dejarlo todo sin marcar.</p>
+            <div style={{ fontSize: 13, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Alimentos que no te gustan</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 30 }}>
+              {ALIMENTOS.map((a) => (
+                <button key={a.id} onClick={() => toggle("noGusta", a.id)} style={chip(datos.noGusta.includes(a.id))}>{a.nombre}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 13, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Alergias e intolerancias</div>
+            <p style={{ color: C.dim, fontSize: 13, margin: "0 0 12px" }}>Se excluirán siempre de tu plan, sin excepción.</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {ALERGENOS.map((a) => (
+                <button key={a.id} onClick={() => toggle("alergias", a.id)} style={chip(datos.alergias.includes(a.id))}>⚠ {a.nombre}</button>
+              ))}
+            </div>
+          </>
+        )}
+        {paso === 4 && (
+          <>
+            <h2 style={{ ...DF, fontSize: "clamp(30px,5vw,46px)", fontWeight: 800, margin: "0 0 8px" }}>¿Cuántas comidas al día?</h2>
+            <p style={{ color: C.dim, marginBottom: 28 }}>Repartiremos tus calorías entre ellas.</p>
+            <div style={{ display: "grid", gap: 12 }}>
+              {[3, 4, 5].map((n) => (
+                <button key={n} onClick={() => set("comidasDia", n)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.comidasDia === n ? "linear-gradient(135deg, rgba(255,77,46,.18), rgba(255,154,60,.08))" : C.panel, border: `1.5px solid ${datos.comidasDia === n ? C.hot1 : C.line}` }}>
+                  <div style={{ ...DF, fontWeight: 800, fontSize: 22 }}>{n} <span style={{ fontSize: 13, fontWeight: 400, color: C.dim }}>comidas</span></div>
+                  <div style={{ color: C.dim, fontSize: 13, marginTop: 3 }}>{REPARTO[n].map((f) => f.nombre).join(" · ")}</div>
+                </button>
               ))}
             </div>
           </>
         )}
       </div>
-      <button onClick={next} disabled={!puedeSeguir} style={{ ...(puedeSeguir ? grad : { background: C.panel2 }), marginTop: 34, border: "none", color: puedeSeguir ? "#0A0B0D" : C.dim, fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: 18, borderRadius: 999, width: "100%", opacity: puedeSeguir ? 1 : 0.6, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < 2 ? "CONTINUAR →" : "GENERAR MI PLAN ⚡"}</button>
+      <button onClick={next} disabled={!puedeSeguir} style={{ ...(puedeSeguir ? grad : { background: C.panel2 }), marginTop: 34, border: "none", color: puedeSeguir ? "#0A0B0D" : C.dim, fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: 18, borderRadius: 999, width: "100%", opacity: puedeSeguir ? 1 : 0.6, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < ultimo ? "CONTINUAR →" : "GENERAR MI PLAN ⚡"}</button>
     </div>
   );
 }
 
 function Scan({ onDone }) {
-  const frases = ["Analizando tu metabolismo…", "Calculando calorías y macros…", "Diseñando tu dieta semanal…", "Construyendo tus entrenamientos…", "Ajustando a tu nivel…"];
+  const frases = ["Analizando tu metabolismo…", "Calculando calorías y macros…", "Filtrando recetas según tus preferencias…", "Diseñando tu semana de comidas…", "Ajustando cantidades a tu objetivo…"];
   const [i, setI] = useState(0);
   useEffect(() => { const t = setInterval(() => setI((x) => x + 1), 720); return () => clearInterval(t); }, []);
   useEffect(() => { if (i >= frases.length) onDone(); }, [i, onDone]);
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ position: "relative", width: 200, height: 260, borderRadius: 24, overflow: "hidden", border: `1px solid ${C.line}`, marginBottom: 40 }}>
-        <img src={U("1517838277536-f5f99be501cd", 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: "grayscale(.4) brightness(.7)" }} />
+        <img src={U("1504674900247-0877df9cc836", 600)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", filter: "grayscale(.4) brightness(.7)" }} />
         <div style={{ position: "absolute", left: 0, right: 0, height: 3, ...grad, boxShadow: `0 0 24px ${C.hot1}`, animation: "scanline 1.4s linear infinite" }} />
       </div>
       <div className="fadeUp" key={i} style={{ ...DF, fontSize: 22, fontWeight: 700 }}>{frases[Math.min(i, frases.length - 1)]}</div>
@@ -440,15 +776,15 @@ function Scan({ onDone }) {
 }
 
 function Plan({ datos, onReset, onLogin }) {
-  const [tab, setTab] = useState("entreno");
   const [diaDieta, setDiaDieta] = useState(0);
-  const [exAbierto, setExAbierto] = useState<string | null>(null);
+  const [recetaAbierta, setRecetaAbierta] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
   const { user, enabled } = useAuth();
   const m = useMemo(() => calcularMetricas(datos), [datos]);
-  const entreno = useMemo(() => buildWorkout(datos.objetivo, datos.nivel, datos.dias), [datos]);
-  const dieta = useMemo(() => buildDiet(datos.objetivo), [datos.objetivo]);
+  const dieta = useMemo(() => buildDiet(datos, m.kcal), [datos, m.kcal]);
   const obj = OBJETIVOS.find((o) => o.id === datos.objetivo);
+  const tipoDieta = TIPOS_DIETA.find((t) => t.id === datos.tipoDieta);
+  const alergiasNombres = ALERGENOS.filter((a) => datos.alergias.includes(a.id)).map((a) => a.nombre);
 
   // Si el usuario ha iniciado sesión, guarda su plan en la nube (uno por usuario).
   useEffect(() => {
@@ -488,34 +824,17 @@ function Plan({ datos, onReset, onLogin }) {
     const rule = () => { ensure(16); doc.setDrawColor(224); doc.line(margin, y, pageW - margin, y); y += 16; };
 
     line("PULSO", { size: 24, style: "bold", color: [255, 77, 46], gap: 3 });
-    line("Tu plan personalizado", { size: 15, style: "bold" });
+    line("Tu plan de alimentación personalizado", { size: 15, style: "bold" });
     space(4);
-    line(`Objetivo: ${obj?.titulo}   |   Nivel: ${cap(datos.nivel)}   |   ${datos.dias} entrenos/semana`, { size: 10, color: [110, 110, 110], gap: 3 });
-    line(`${cap(datos.sexo)} · ${datos.edad} años · ${datos.peso} kg · ${datos.altura} cm`, { size: 10, color: [110, 110, 110] });
+    line(`Objetivo: ${obj?.titulo}   |   Dieta: ${tipoDieta?.titulo}   |   ${datos.comidasDia} comidas/día`, { size: 10, color: [110, 110, 110], gap: 3 });
+    line(`${cap(datos.sexo)} · ${datos.edad} años · ${datos.peso} kg · ${datos.altura} cm`, { size: 10, color: [110, 110, 110], gap: 3 });
+    if (alergiasNombres.length) line(`Sin: ${alergiasNombres.join(", ")}`, { size: 10, color: [110, 110, 110] });
     space(8);
 
     line("OBJETIVO NUTRICIONAL DIARIO", { size: 12, style: "bold" });
     space(2);
     line(`Calorías: ${m.kcal} kcal      Proteína: ${m.prot} g      Carbohidratos: ${m.carbs} g      Grasas: ${m.grasa} g`, { size: 11 });
     space(6);
-    rule();
-
-    line("ENTRENAMIENTO", { size: 15, style: "bold", color: [255, 77, 46] });
-    space(4);
-    entreno.forEach((dia) => {
-      ensure(50);
-      line(dia.titulo, { size: 12.5, style: "bold" });
-      line(dia.foco, { size: 9, color: [125, 125, 125] });
-      space(3);
-      dia.ejercicios.forEach((ex) => {
-        ensure(34);
-        line(`•  ${ex.nombre}   (${ex.musculo})`, { size: 10.5, style: "bold", indent: 6, gap: 3 });
-        line(`${ex.series} series × ${ex.reps}   ·   descanso ${ex.descanso}`, { size: 9.5, color: [90, 90, 90], indent: 16, gap: 3 });
-        ex.pasos.forEach((p, i) => line(`${i + 1}. ${p}`, { size: 9, color: [115, 115, 115], indent: 16, gap: 2 }));
-        space(4);
-      });
-      space(6);
-    });
     rule();
 
     line("DIETA SEMANAL", { size: 15, style: "bold", color: [255, 77, 46] });
@@ -526,21 +845,42 @@ function Plan({ datos, onReset, onLogin }) {
       space(1);
       d.comidas.forEach((c) => {
         ensure(26);
-        line(`${c.hora}  ·  ${c.nombre}`, { size: 9.5, style: "bold", color: [90, 90, 90], indent: 6, gap: 2 });
-        line(c.plato, { size: 10, indent: 16, gap: 3 });
+        line(`${c.hora}  ·  ${c.nombre}   (~${c.kcal} kcal)`, { size: 9.5, style: "bold", color: [90, 90, 90], indent: 6, gap: 2 });
+        line(c.receta.nombre, { size: 10, indent: 16, gap: 3 });
       });
       space(7);
+    });
+    rule();
+
+    // Recetario: cada receta usada en la semana, una sola vez, con
+    // ingredientes y modo de elaboración completos.
+    const recetario: any[] = [];
+    const vistos = new Set();
+    dieta.forEach((d) => d.comidas.forEach((c) => { if (!vistos.has(c.receta.id)) { vistos.add(c.receta.id); recetario.push(c.receta); } }));
+    line("RECETARIO", { size: 15, style: "bold", color: [255, 77, 46] });
+    space(4);
+    recetario.forEach((r) => {
+      ensure(60);
+      line(r.nombre, { size: 11.5, style: "bold" });
+      line(`${cap(r.categoria)} · ~${r.kcalAprox} kcal por ración`, { size: 9, color: [125, 125, 125], gap: 3 });
+      space(2);
+      line("Ingredientes:", { size: 9.5, style: "bold", color: [90, 90, 90], indent: 6, gap: 3 });
+      r.ingredientes.forEach((ing) => line(`•  ${ing.cantidad} — ${ing.nombre}`, { size: 9.5, indent: 16, gap: 2 }));
+      space(2);
+      line("Elaboración:", { size: 9.5, style: "bold", color: [90, 90, 90], indent: 6, gap: 3 });
+      r.pasos.forEach((p, i) => line(`${i + 1}. ${p}`, { size: 9, color: [115, 115, 115], indent: 16, gap: 2 }));
+      space(8);
     });
     space(4);
     line("Plan orientativo con fines informativos. No sustituye el consejo de un médico o dietista.", { size: 8, color: [150, 150, 150] });
 
-    doc.save(`plan-pulso-${datos.objetivo}.pdf`);
+    doc.save(`dieta-pulso-${datos.objetivo}.pdf`);
   };
 
   return (
     <div>
       <div style={{ position: "relative", height: 340, overflow: "hidden" }}>
-        <img src={obj?.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <img src={obj?.img} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
         <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
           <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
@@ -552,8 +892,8 @@ function Plan({ datos, onReset, onLogin }) {
           </div>
         </header>
         <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
-          <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>Tu plan · {obj?.titulo}</div>
-          <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{datos.dias} entrenos/semana · <span style={gradText}>{m.kcal} kcal</span></h1>
+          <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>Tu plan · {obj?.titulo}{datos.tipoDieta !== "omnivora" ? ` · ${tipoDieta?.titulo}` : ""}</div>
+          <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{datos.comidasDia} comidas/día · <span style={gradText}>{m.kcal} kcal</span></h1>
         </div>
       </div>
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "0 18px 80px" }}>
@@ -566,95 +906,83 @@ function Plan({ datos, onReset, onLogin }) {
             </div>
           ))}
         </section>
-        <div style={{ display: "flex", gap: 8, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 999, padding: 6, margin: "26px 0", position: "sticky", top: 10, zIndex: 20 }}>
-          {[["entreno", "🏋️ Entrenamiento"], ["dieta", "🥗 Dieta semanal"]].map(([id, t]) => (
-            <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: 13, borderRadius: 999, border: "none", fontWeight: 700, fontSize: 15, color: tab === id ? "#0A0B0D" : C.dim, ...(tab === id ? grad : { background: "transparent" }) }}>{t}</button>
-          ))}
-        </div>
-        {tab === "entreno" && (
-          <div className="fadeUp">
-            {entreno.map((dia, di) => (
-              <section key={dia.titulo} style={{ marginBottom: 34 }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14 }}>
-                  <h2 style={{ ...DF, fontSize: 24, fontWeight: 800, margin: 0 }}>{dia.titulo}</h2>
-                  <span style={{ fontSize: 13, color: C.dim }}>{dia.foco}</span>
-                </div>
-                <div style={{ display: "grid", gap: 14 }}>
-                  {dia.ejercicios.map((ex, ei) => {
-                    const id = `${di}-${ei}`; const abierto = exAbierto === id;
-                    return (
-                      <div key={id} className="exwrap" style={{ background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
-                        <button onClick={() => setExAbierto(abierto ? null : id)} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
-                          <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
-                            <img className="eximg" src={EXIMG[ex.key]} alt={ex.nombre} loading="lazy" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
-                          </div>
-                          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", minWidth: 0 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ ...DF, fontWeight: 800, fontSize: 17 }}>{ex.nombre}</div>
-                              <div style={{ fontSize: 12, color: C.dim, marginTop: 2 }}>{ex.musculo}</div>
-                            </div>
-                            <div style={{ textAlign: "right", flexShrink: 0 }}>
-                              <div style={{ ...DF, fontWeight: 800, fontSize: 17 }}>{ex.series} × {ex.reps}</div>
-                              <div style={{ fontSize: 11, color: C.dim }}>descanso {ex.descanso}</div>
-                            </div>
-                            <div style={{ color: C.dim, fontSize: 18 }}>{abierto ? "−" : "+"}</div>
-                          </div>
-                        </button>
-                        {abierto && (
-                          <div className="fadeUp" style={{ padding: "0 16px 18px", display: "grid", gridTemplateColumns: "minmax(140px,200px) 1fr", gap: 18, alignItems: "start" }}>
-                            <img src={EXIMG[ex.key]} alt={ex.nombre} onError={onImgError} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
-                            <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
-                              {ex.pasos.map((p, pi) => (
-                                <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
-                                  <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
-                                </li>
-                              ))}
-                            </ol>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
-            <div style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>💡 Calienta 5–10 min antes. Descansa al menos un día entre sesiones. Si un ejercicio causa dolor (no esfuerzo), páralo y consulta a un profesional.</div>
-          </div>
-        )}
-        {tab === "dieta" && (
-          <div className="fadeUp">
-            <div style={{ position: "relative", height: 150, borderRadius: 20, overflow: "hidden", marginBottom: 18 }}>
-              <img src={BANNER_DIETA} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(10,11,13,.85), rgba(10,11,13,.3))", display: "flex", alignItems: "center", padding: "0 26px" }}>
-                <div>
-                  <div style={{ ...DF, fontSize: 24, fontWeight: 800 }}>Tu semana de comidas</div>
-                  <div style={{ color: C.dim, fontSize: 13, marginTop: 4 }}>~{m.kcal} kcal · {m.prot} g proteína al día</div>
-                </div>
+        <div className="fadeUp" style={{ marginTop: 26 }}>
+          <div style={{ position: "relative", height: 150, borderRadius: 20, overflow: "hidden", marginBottom: 14 }}>
+            <img src={BANNER_DIETA} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(10,11,13,.85), rgba(10,11,13,.3))", display: "flex", alignItems: "center", padding: "0 26px" }}>
+              <div>
+                <div style={{ ...DF, fontSize: 24, fontWeight: 800 }}>Tu semana de comidas</div>
+                <div style={{ color: C.dim, fontSize: 13, marginTop: 4 }}>~{m.kcal} kcal · {m.prot} g proteína al día</div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 18 }}>
-              {dieta.map((d, i) => (
-                <button key={d.dia} onClick={() => setDiaDieta(i)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${diaDieta === i ? C.hot1 : C.line}`, color: diaDieta === i ? "#0A0B0D" : C.dim, ...(diaDieta === i ? grad : { background: C.panel }) }}>{d.dia}</button>
-              ))}
-            </div>
-            <div style={{ display: "grid", gap: 12 }}>
-              {dieta[diaDieta].comidas.map((c, i) => (
-                <div key={c.nombre} className="fadeUp" style={{ animationDelay: `${i * 55}ms`, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 18, padding: "14px 16px", display: "flex", gap: 14, alignItems: "center" }}>
-                  <div style={{ textAlign: "center", flexShrink: 0, width: 50 }}>
-                    <div style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15 }}>{c.hora}</div>
-                    <div style={{ height: 3, borderRadius: 3, ...grad, marginTop: 6, opacity: .5 }} />
-                  </div>
-                  <img src={platoImg(c.plato)} alt={c.plato} loading="lazy" onError={onImgError} style={{ width: 76, height: 76, borderRadius: 14, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.line}` }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase" }}>{c.nombre}</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4, lineHeight: 1.45 }}>{c.plato}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>💧 Bebe 2–2,5 L de agua al día. Las cantidades son orientativas: ajústalas a tu hambre y progreso. Plan informativo, no sustituye a un médico o dietista.</div>
           </div>
-        )}
+          {(datos.tipoDieta !== "omnivora" || alergiasNombres.length > 0) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+              {datos.tipoDieta !== "omnivora" && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.hot2, border: `1px solid ${C.line}`, background: C.panel, borderRadius: 999, padding: "6px 14px" }}>🥗 {tipoDieta?.titulo}</span>
+              )}
+              {alergiasNombres.map((n) => (
+                <span key={n} style={{ fontSize: 12, fontWeight: 700, color: C.hot2, border: `1px solid ${C.line}`, background: C.panel, borderRadius: 999, padding: "6px 14px" }}>🚫 Sin {n.toLowerCase()}</span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 18 }}>
+            {dieta.map((d, i) => (
+              <button key={d.dia} onClick={() => setDiaDieta(i)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${diaDieta === i ? C.hot1 : C.line}`, color: diaDieta === i ? "#0A0B0D" : C.dim, ...(diaDieta === i ? grad : { background: C.panel }) }}>{d.dia}</button>
+            ))}
+          </div>
+          <div style={{ display: "grid", gap: 14 }}>
+            {dieta[diaDieta].comidas.map((c, i) => {
+              const id = `${diaDieta}-${i}`;
+              const abierto = recetaAbierta === id;
+              const img = U(FOODIMG[c.receta.img], 600);
+              return (
+                <div key={id} className="exwrap fadeUp" style={{ animationDelay: `${i * 55}ms`, background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
+                  <button onClick={() => setRecetaAbierta(abierto ? null : id)} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
+                    <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
+                      <img className="eximg" src={img} alt={c.receta.nombre} loading="lazy" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
+                    </div>
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase" }}>{c.hora} · {c.nombre}</div>
+                        <div style={{ ...DF, fontWeight: 800, fontSize: 17, marginTop: 4, lineHeight: 1.3 }}>{c.receta.nombre}</div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 17 }}>~{c.kcal}</div>
+                        <div style={{ fontSize: 11, color: C.dim }}>kcal</div>
+                      </div>
+                      <div style={{ color: C.dim, fontSize: 18 }}>{abierto ? "−" : "+"}</div>
+                    </div>
+                  </button>
+                  {abierto && (
+                    <div className="fadeUp" style={{ padding: "0 16px 18px", display: "grid", gridTemplateColumns: "minmax(140px,200px) 1fr", gap: 18, alignItems: "start" }}>
+                      <img src={img} alt={c.receta.nombre} onError={onImgError} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
+                      <div>
+                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Ingredientes</div>
+                        <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
+                          {c.receta.ingredientes.map((ing) => (
+                            <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#D6D9DE" }}>
+                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 13, flexShrink: 0, minWidth: 74 }}>{ing.cantidad}</span>{ing.nombre}
+                            </li>
+                          ))}
+                        </ul>
+                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "18px 0 10px" }}>Modo de elaboración</div>
+                        <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+                          {c.receta.pasos.map((p, pi) => (
+                            <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
+                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>💧 Bebe 2–2,5 L de agua al día. Las cantidades son orientativas: ajústalas a tu hambre y progreso. Plan informativo, no sustituye a un médico o dietista.</div>
+        </div>
       </div>
     </div>
   );
