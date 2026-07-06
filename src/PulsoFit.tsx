@@ -868,12 +868,45 @@ function Plan({ datos, onReset, onLogin }) {
     const recetario: any[] = [];
     const vistos = new Set();
     dieta.forEach((d) => d.comidas.forEach((c) => { if (!vistos.has(c.receta.id)) { vistos.add(c.receta.id); recetario.push(c.receta); } }));
+
+    // Precarga de las fotos a dataURL (JPEG) para incrustarlas con addImage.
+    // Se recorta un cuadrado centrado (efecto "cover"). Unsplash admite CORS;
+    // si una imagen falla o el canvas queda "tainted", se resuelve a null y la
+    // receta sale sin foto (nunca rompe el PDF).
+    const TH = 54; // lado de la miniatura en pt
+    const cargarThumb = (url) => new Promise<string | null>((resolve) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => {
+        try {
+          const px = 140, cv = document.createElement("canvas");
+          cv.width = px; cv.height = px;
+          const ctx = cv.getContext("2d")!;
+          const lado = Math.min(im.width, im.height);
+          ctx.drawImage(im, (im.width - lado) / 2, (im.height - lado) / 2, lado, lado, 0, 0, px, px);
+          resolve(cv.toDataURL("image/jpeg", 0.7));
+        } catch { resolve(null); }
+      };
+      im.onerror = () => resolve(null);
+      im.src = url;
+    });
+    const thumbs: Record<string, string | null> = {};
+    await Promise.all(recetario.map(async (r) => { thumbs[r.id] = await cargarThumb(U(FOODIMG[r.img] || FOODIMG.otro, 200)); }));
+
     line("RECETARIO", { size: 15, style: "bold", color: [255, 77, 46] });
     space(4);
     recetario.forEach((r) => {
-      ensure(60);
-      line(r.nombre, { size: 11.5, style: "bold" });
-      line(`${cap(r.categoria)} · ~${r.kcalAprox} kcal por ración`, { size: 9, color: [125, 125, 125], gap: 3 });
+      ensure(TH + 10);
+      const thumb = thumbs[r.id];
+      const yTop = y;
+      // alias `rec-<id>` evita reincrustar la misma imagen si se repitiera; FAST comprime el JPEG.
+      if (thumb) { try { doc.addImage(thumb, "JPEG", margin, yTop, TH, TH, `rec-${r.id}`, "FAST"); } catch {} }
+      const tInd = thumb ? TH + 10 : 0;
+      line(r.nombre, { size: 11.5, style: "bold", indent: tInd });
+      line(`${cap(r.categoria)} · ~${r.kcalAprox} kcal por ración`, { size: 9, color: [125, 125, 125], gap: 3, indent: tInd });
+      // El texto se dibuja desde su línea base hacia arriba: dejamos margen bajo
+      // la miniatura para que "Ingredientes:" no se solape con la foto.
+      if (thumb) y = Math.max(y, yTop + TH + 10);
       space(2);
       line("Ingredientes:", { size: 9.5, style: "bold", color: [90, 90, 90], indent: 6, gap: 3 });
       r.ingredientes.forEach((ing) => line(`•  ${ing.cantidad} — ${ing.nombre}`, { size: 9.5, indent: 16, gap: 2 }));
