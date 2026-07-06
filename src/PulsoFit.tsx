@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "./auth";
 import { supabase } from "./supabase";
 
@@ -488,15 +488,23 @@ export default function App() {
   const [planGuardado, setPlanGuardado] = useState(null);
   const set = (k, v) => setDatos((d) => ({ ...d, [k]: v }));
   const { user } = useAuth();
+  // Fase actual accesible dentro de callbacks asíncronos sin cerrar sobre un valor obsoleto.
+  const faseRef = useRef(fase);
+  useEffect(() => { faseRef.current = fase; }, [fase]);
   useEffect(() => { window.scrollTo(0, 0); }, [fase, paso]);
 
-  // Al iniciar sesión, recupera el último plan guardado del usuario (migrándolo si es antiguo).
+  // Al iniciar sesión (o restaurar la sesión al recargar), recupera el último plan
+  // guardado del usuario (migrándolo si es antiguo). Si ya tiene un plan y sigue en
+  // la portada, lo lleva directo a él en vez de repetir el cuestionario; solo vuelve
+  // a la portada cuando el usuario pulsa "Empezar de nuevo".
   useEffect(() => {
     if (!supabase || !user) { setPlanGuardado(null); return; }
     supabase.from("planes").select("datos").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => {
         const migrado = migrarDatos(data?.datos ?? null);
-        setPlanGuardado(migrado && migrado.objetivo ? migrado : null);
+        const plan = migrado && migrado.objetivo ? migrado : null;
+        setPlanGuardado(plan);
+        if (plan && faseRef.current === "hero") { setDatos(plan); setFase("plan"); }
       });
   }, [user]);
 
