@@ -22,6 +22,9 @@ const U = (id, w = 1600) => `https://images.unsplash.com/photo-${id}?auto=format
 // Imagen de reserva (degradado de marca) si alguna foto no carga: evita el icono de "imagen rota".
 const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#FF4D2E'/><stop offset='1' stop-color='#FF9A3C'/></linearGradient></defs><rect width='400' height='400' fill='#1A1D22'/><circle cx='200' cy='210' r='78' fill='url(#g)' opacity='0.28'/><circle cx='200' cy='210' r='40' fill='url(#g)' opacity='0.5'/></svg>`)}`;
 const onImgError = (e) => { const t = e.currentTarget; if (t.src !== FALLBACK_IMG) t.src = FALLBACK_IMG; };
+// Enlace a una búsqueda en YouTube por el nombre de la receta: siempre funciona
+// y no depende de un vídeo concreto que pueda borrarse.
+const youtubeUrl = (nombre) => `https://www.youtube.com/results?search_query=${encodeURIComponent(nombre + " receta")}`;
 
 // Banco de fotos de plato por tipo de ingrediente principal (Unsplash).
 const FOODIMG = {
@@ -974,6 +977,10 @@ function Plan({ datos, onReset, onLogin }) {
                             </li>
                           ))}
                         </ol>
+                        <a href={youtubeUrl(c.receta.nombre)} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.05)", border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 14, color: C.text }}>
+                          <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
+                          Ver vídeo de la receta en YouTube
+                        </a>
                       </div>
                     </div>
                   )}
