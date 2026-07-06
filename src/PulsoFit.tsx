@@ -380,6 +380,59 @@ const RECETAS = [
   },
 ];
 
+// Recetas icónicas de películas y series. Sección independiente ("cine"):
+// NO participan en el plan semanal ni en el PDF (buildDiet/descargarPDF solo usan RECETAS).
+const RECETAS_CINE = [
+  {
+    id: "bearItalianBeef", obra: "The Bear", tipo: "serie", plato: "Sándwich de ternera italiana (Italian Beef)", img: "carne",
+    escena: "El sándwich estrella de The Beef, el local de Chicago que Carmy hereda y que da origen a toda la serie.",
+    ingredientes: [{ nombre: "Pan tipo baguette blanda", cantidad: "1 unidad" }, { nombre: "Redondo de ternera asado en lonchas muy finas", cantidad: "200 g" }, { nombre: "Caldo de carne (jus)", cantidad: "250 ml" }, { nombre: "Giardiniera (encurtido picante italiano)", cantidad: "3 cucharadas" }, { nombre: "Pimiento verde asado", cantidad: "½ unidad" }, { nombre: "Ajo, orégano y pimienta", cantidad: "al gusto" }],
+    pasos: ["Calienta el caldo con ajo, orégano y pimienta y deja que reduzca 10 minutos.", "Sumerge las lonchas de ternera en el caldo caliente 1-2 minutos, sin que se sequen.", "Abre el pan y rellénalo con la carne escurrida.", "Corona con giardiniera y tiras de pimiento asado.", "Al estilo Chicago: moja medio sándwich en el jus antes de servir (\"dipped\")."],
+  },
+  {
+    id: "bearTortilla", obra: "The Bear", tipo: "serie", plato: "Tortilla francesa con chips y cebollino", img: "huevo",
+    escena: "La tortilla que Sydney prepara para Natalie en la 2ª temporada: queso Boursin dentro y patatas chips machacadas por encima.",
+    ingredientes: [{ nombre: "Huevos", cantidad: "3 unidades" }, { nombre: "Queso crema con hierbas (tipo Boursin)", cantidad: "2 cucharadas" }, { nombre: "Patatas chips de crema y cebolla", cantidad: "1 puñado" }, { nombre: "Cebollino picado", cantidad: "1 cucharada" }, { nombre: "Mantequilla", cantidad: "1 nuez" }],
+    pasos: ["Bate los huevos y cuélalos para una textura extrafina.", "Cuájalos a fuego muy suave con la mantequilla, removiendo sin parar: no deben dorarse.", "Antes de cerrar la tortilla, reparte el queso por el centro.", "Enróllala con cuidado, en forma de puro.", "Píntala con mantequilla y termina con las chips machacadas y el cebollino."],
+  },
+  {
+    id: "ratatouille", obra: "Ratatouille", tipo: "peli", plato: "Ratatouille (confit byaldi)", img: "verdura",
+    escena: "El plato que Rémy sirve al crítico Anton Ego y que le devuelve de golpe a su infancia.",
+    ingredientes: [{ nombre: "Calabacín", cantidad: "1 unidad" }, { nombre: "Berenjena", cantidad: "1 unidad" }, { nombre: "Tomate pera", cantidad: "3 unidades" }, { nombre: "Pimiento rojo asado", cantidad: "1 unidad" }, { nombre: "Salsa de tomate", cantidad: "200 g" }, { nombre: "Aceite de oliva y tomillo", cantidad: "al gusto" }],
+    pasos: ["Corta el calabacín, la berenjena y el tomate en rodajas muy finas.", "Extiende la salsa de tomate con el pimiento triturado en la base de una fuente.", "Coloca las rodajas en abanico, alternando colores.", "Riega con aceite, sal y tomillo, y cubre con papel de horno.", "Hornea 45 minutos a 160 °C. Sirve con un cordón de aceite, como en la película."],
+  },
+  {
+    id: "chefCubano", obra: "Chef", tipo: "peli", plato: "Sándwich cubano", img: "tostada",
+    escena: "El sándwich con el que Carl Casper recorre EE. UU. en su food truck 'El Jefe' junto a su hijo.",
+    ingredientes: [{ nombre: "Pan cubano o chapata", cantidad: "1 unidad" }, { nombre: "Cerdo asado en lonchas", cantidad: "120 g" }, { nombre: "Jamón cocido", cantidad: "2 lonchas" }, { nombre: "Queso suizo (emmental)", cantidad: "2 lonchas" }, { nombre: "Pepinillos en rodajas", cantidad: "4 unidades" }, { nombre: "Mostaza y mantequilla", cantidad: "al gusto" }],
+    pasos: ["Unta el pan con mostaza por dentro y mantequilla por fuera.", "Monta capas de cerdo, jamón, queso y pepinillos.", "Prénsalo en sartén o plancha con peso encima, 3-4 minutos por lado.", "Está listo cuando el queso funde y el pan cruje.", "Córtalo en diagonal, como manda Casper."],
+  },
+  {
+    id: "pulpBurger", obra: "Pulp Fiction", tipo: "peli", plato: "Hamburguesa Big Kahuna", img: "carne",
+    escena: "\"Mmm, esto sí que es una hamburguesa sabrosa\": la hamburguesa hawaiana que Jules prueba en el apartamento de Brett.",
+    ingredientes: [{ nombre: "Carne picada de ternera", cantidad: "180 g" }, { nombre: "Pan de hamburguesa brioche", cantidad: "1 unidad" }, { nombre: "Queso cheddar", cantidad: "1 loncha" }, { nombre: "Piña a la plancha", cantidad: "1 rodaja" }, { nombre: "Lechuga, tomate y cebolla morada", cantidad: "al gusto" }, { nombre: "Salsa barbacoa", cantidad: "1 cucharada" }],
+    pasos: ["Forma la hamburguesa sin apretar demasiado y salpimienta.", "Hazla a fuego fuerte 3 minutos por lado; funde el cheddar encima al final.", "Marca la rodaja de piña en la misma sartén.", "Monta: pan, salsa, lechuga, carne con queso, piña, tomate y cebolla.", "Acompáñala de un buen refresco... aunque no sea un batido de 5 dólares."],
+  },
+  {
+    id: "padrinoSalsa", obra: "El Padrino", tipo: "peli", plato: "Espaguetis con la salsa de Clemenza", img: "pasta",
+    escena: "Clemenza enseña a Michael a cocinar para veinte: \"Primero doras el ajo, luego echas el tomate...\".",
+    ingredientes: [{ nombre: "Espaguetis", cantidad: "100 g" }, { nombre: "Tomate triturado", cantidad: "400 g" }, { nombre: "Albóndigas pequeñas", cantidad: "6 unidades" }, { nombre: "Salchichas frescas", cantidad: "2 unidades" }, { nombre: "Ajo", cantidad: "2 dientes" }, { nombre: "Vino tinto y una pizca de azúcar", cantidad: "un chorrito" }],
+    pasos: ["Dora el ajo laminado en aceite, sin quemarlo.", "Añade el tomate y deja que hierva suave.", "Incorpora las albóndigas y las salchichas doradas.", "Echa el chorrito de vino y la pizca de azúcar, el truco de Clemenza.", "Cuece 30 minutos a fuego lento y sirve sobre los espaguetis."],
+  },
+  {
+    id: "rossSandwich", obra: "Friends", tipo: "serie", plato: "El sándwich de Ross (con 'jugosín')", img: "tostada",
+    escena: "El sándwich de sobras de Acción de Gracias que le roban a Ross en el trabajo: su secreto es la rebanada central empapada en salsa.",
+    ingredientes: [{ nombre: "Pan de molde", cantidad: "3 rebanadas" }, { nombre: "Pavo asado en lonchas", cantidad: "120 g" }, { nombre: "Relleno de pan y verduras (stuffing)", cantidad: "3 cucharadas" }, { nombre: "Salsa de carne (gravy)", cantidad: "100 ml" }, { nombre: "Arándanos en salsa", cantidad: "1 cucharada" }],
+    pasos: ["Empapa la rebanada central en la salsa caliente: es el famoso 'jugosín' (moist maker).", "Monta la base con pavo y relleno.", "Coloca encima la rebanada empapada.", "Añade más pavo y los arándanos.", "Cierra el sándwich y córtalo por la mitad. Y que nadie te lo quite de la nevera del trabajo."],
+  },
+  {
+    id: "pollosHermanos", obra: "Breaking Bad", tipo: "serie", plato: "Pollo frito Los Pollos Hermanos", img: "pollo",
+    escena: "El pollo crujiente del restaurante de Gus Fring, la tapadera más famosa de Albuquerque.",
+    ingredientes: [{ nombre: "Contramuslos de pollo", cantidad: "4 unidades" }, { nombre: "Leche + zumo de ½ limón (suero casero)", cantidad: "250 ml" }, { nombre: "Harina", cantidad: "150 g" }, { nombre: "Pimentón, ajo en polvo y cayena", cantidad: "1 cucharadita de cada" }, { nombre: "Aceite para freír", cantidad: "abundante" }],
+    pasos: ["Mezcla la leche con el limón y marina el pollo 1 hora en la nevera.", "Mezcla la harina con las especias y sal.", "Escurre el pollo y rebózalo presionando para que la costra agarre.", "Fríe a 170 °C unos 14 minutos, hasta que esté dorado y hecho por dentro.", "Escurre sobre rejilla para que quede crujiente, digno de Gus Fring."],
+  },
+];
+
 const SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 // Franjas de comida según el nº de comidas al día, con reparto calórico orientativo.
@@ -458,6 +511,7 @@ const OBJETIVOS = [
 ];
 const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
+const BANNER_CINE = U("1489599849927-2ee91cede3ba"); // butacas de cine; si falla, onImgError pone el degradado de marca
 
 /* Migra un plan guardado con el formato antiguo (app con entrenamientos)
    al formato actual. Los objetivos antiguos se traducen a los nuevos y
@@ -510,6 +564,10 @@ export default function App() {
 
   const retomarPlan = () => { if (planGuardado) { setDatos(planGuardado); setFase("plan"); } };
 
+  // Sección "cine": recuerda desde qué pantalla se abrió para volver a ella.
+  const [cineDesde, setCineDesde] = useState("hero");
+  const abrirCine = () => { setCineDesde(fase); setFase("cine"); };
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <style>{`
@@ -524,10 +582,11 @@ export default function App() {
         @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; } }
         .exwrap:hover .eximg { transform: scale(1.06); }
       `}</style>
-      {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} />}
+      {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} onCine={abrirCine} />}
       {fase === "form" && <Formulario datos={datos} set={set} paso={paso} setPaso={setPaso} onFinish={() => setFase("scan")} onBack={() => setFase("hero")} />}
       {fase === "scan" && <Scan onDone={() => setFase("plan")} />}
-      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} />}
+      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} onCine={abrirCine} />}
+      {fase === "cine" && <Cine onBack={() => setFase(cineDesde)} onLogin={() => setAuthAbierto(true)} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
   );
@@ -613,7 +672,7 @@ function CuentaChip({ onLogin, oscuro }) {
   );
 }
 
-function Hero({ onStart, onLogin, planGuardado, onRetomar }) {
+function Hero({ onStart, onLogin, planGuardado, onRetomar, onCine }) {
   return (
     <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
@@ -635,6 +694,7 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar }) {
           {planGuardado && (
             <button onClick={onRetomar} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>↩ Continuar con mi plan guardado</button>
           )}
+          <button onClick={onCine} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>🎬 Recetas de cine y series</button>
         </div>
         <div style={{ display: "flex", gap: 48, marginTop: 60, flexWrap: "wrap" }}>
           {[["4", "objetivos"], ["7 días", "de dieta"], [`${RECETAS.length}`, "recetas con foto"]].map(([n, t]) => (
@@ -786,7 +846,7 @@ function Scan({ onDone }) {
   );
 }
 
-function Plan({ datos, onReset, onLogin }) {
+function Plan({ datos, onReset, onLogin, onCine }) {
   const [diaDieta, setDiaDieta] = useState(0);
   const [recetaAbierta, setRecetaAbierta] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
@@ -931,6 +991,7 @@ function Plan({ datos, onReset, onLogin }) {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
             {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700 }}>✓ Guardado</span>}
             <button onClick={descargarPDF} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "8px 18px", fontSize: 13, boxShadow: "0 6px 22px rgba(255,77,46,.35)" }}>⬇ Descargar PDF</button>
+            <button onClick={onCine} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>🎬 Cine</button>
             <button onClick={onReset} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>↺ Empezar de nuevo</button>
             <CuentaChip onLogin={onLogin} oscuro />
           </div>
@@ -1031,6 +1092,94 @@ function Plan({ datos, onReset, onLogin }) {
           </div>
           <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>💧 Bebe 2–2,5 L de agua al día. Las cantidades son orientativas: ajústalas a tu hambre y progreso. Plan informativo, no sustituye a un médico o dietista.</div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Sección "Cocina de película": recetas icónicas de series y pelis, solo para
+// disfrutar. Independiente del plan semanal y del PDF.
+function Cine({ onBack, onLogin }) {
+  const [filtro, setFiltro] = useState("todas"); // "todas" | "serie" | "peli"
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const lista = RECETAS_CINE.filter((r) => filtro === "todas" || r.tipo === filtro);
+  return (
+    <div>
+      <div style={{ position: "relative", height: 300, overflow: "hidden" }}>
+        <img src={BANNER_CINE} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
+        <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
+          <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+            <button onClick={onBack} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>← Volver</button>
+            <CuentaChip onLogin={onLogin} oscuro />
+          </div>
+        </header>
+        <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
+          <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>Fuera del plan · Solo por placer</div>
+          <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>Cocina de <span style={gradText}>película</span></h1>
+        </div>
+      </div>
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 80px" }}>
+        <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Platos míticos de tus series y películas favoritas, con su receta completa para hacerlos en casa. Son un capricho: no cuentan para tu plan semanal ni salen en el PDF.</p>
+        <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+          {[["todas", "Todas"], ["serie", "Series"], ["peli", "Películas"]].map(([id, t]) => (
+            <button key={id} onClick={() => { setFiltro(id); setAbierta(null); }} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${filtro === id ? C.hot1 : C.line}`, color: filtro === id ? "#0A0B0D" : C.dim, ...(filtro === id ? grad : { background: C.panel }) }}>{t}</button>
+          ))}
+        </div>
+        <div style={{ display: "grid", gap: 14 }}>
+          {lista.map((r, i) => {
+            const abierto = abierta === r.id;
+            const img = U(FOODIMG[r.img], 600);
+            return (
+              <div key={r.id} className="exwrap fadeUp" style={{ animationDelay: `${i * 55}ms`, background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
+                <button onClick={() => setAbierta(abierto ? null : r.id)} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
+                  <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
+                    <img className="eximg" src={img} alt={r.plato} loading="lazy" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
+                  </div>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", minWidth: 0 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase" }}>🎬 {r.obra} · {r.tipo === "serie" ? "Serie" : "Película"}</div>
+                      <div style={{ ...DF, fontWeight: 800, fontSize: 17, marginTop: 4, lineHeight: 1.3 }}>{r.plato}</div>
+                    </div>
+                    <div style={{ color: C.dim, fontSize: 18 }}>{abierto ? "−" : "+"}</div>
+                  </div>
+                </button>
+                {abierto && (
+                  <div className="fadeUp" style={{ padding: "0 16px 18px" }}>
+                    <p style={{ color: C.dim, fontSize: 14, lineHeight: 1.6, fontStyle: "italic", margin: "0 0 16px", borderLeft: `3px solid ${C.hot1}`, paddingLeft: 12 }}>{r.escena}</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(140px,200px) 1fr", gap: 18, alignItems: "start" }}>
+                      <img src={img} alt={r.plato} onError={onImgError} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
+                      <div>
+                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Ingredientes</div>
+                        <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
+                          {r.ingredientes.map((ing) => (
+                            <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#D6D9DE" }}>
+                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 13, flexShrink: 0, minWidth: 74 }}>{ing.cantidad}</span>{ing.nombre}
+                            </li>
+                          ))}
+                        </ul>
+                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "18px 0 10px" }}>Modo de elaboración</div>
+                        <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+                          {r.pasos.map((p, pi) => (
+                            <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
+                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
+                            </li>
+                          ))}
+                        </ol>
+                        <a href={youtubeUrl(`${r.plato} ${r.obra}`)} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.05)", border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 14, color: C.text }}>
+                          <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
+                          Ver vídeo de la receta en YouTube
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>🍿 Estos platos son homenajes a sus series y películas: disfrútalos de vez en cuando, sin remordimientos. Tu plan semanal sigue intacto.</div>
       </div>
     </div>
   );
