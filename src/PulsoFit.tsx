@@ -25,6 +25,8 @@ const onImgError = (e) => { const t = e.currentTarget; if (t.src !== FALLBACK_IM
 // Enlace a una búsqueda en YouTube por el nombre de la receta: siempre funciona
 // y no depende de un vídeo concreto que pueda borrarse.
 const youtubeUrl = (nombre) => `https://www.youtube.com/results?search_query=${encodeURIComponent(nombre + " receta")}`;
+// Minúsculas y sin tildes, para que la búsqueda encuentre "sandwich" en "Sándwich".
+const normalizar = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 // Banco de fotos de plato por tipo de ingrediente principal (Unsplash).
 const FOODIMG = {
@@ -382,51 +384,65 @@ const RECETAS = [
 
 // Recetas icónicas de películas y series. Sección independiente ("cine"):
 // NO participan en el plan semanal ni en el PDF (buildDiet/descargarPDF solo usan RECETAS).
+// - fotoEscena: imagen real de la obra (hotlink a los wikis de Fandom / Wikimedia),
+//   se usa como miniatura y como banner de la ficha para que sea fiel a la serie.
+// - fotoPlato: foto real del plato (Wikimedia Commons) para el detalle de la receta.
+// Ambas son opcionales; si faltan o fallan al cargar se cae a la foto de FOODIMG.
 const RECETAS_CINE = [
   {
     id: "bearItalianBeef", obra: "The Bear", tipo: "serie", plato: "Sándwich de ternera italiana (Italian Beef)", img: "carne",
+    fotoEscena: "https://static.wikia.nocookie.net/the-bear/images/c/ce/OriginalBeef.jpg/revision/latest/scale-to-width-down/900?cb=20230120000221",
+    fotoPlato: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Mmm..._Italian_beef_%286286691399%29.jpg/960px-Mmm..._Italian_beef_%286286691399%29.jpg",
     escena: "El sándwich estrella de The Beef, el local de Chicago que Carmy hereda y que da origen a toda la serie.",
     ingredientes: [{ nombre: "Pan tipo baguette blanda", cantidad: "1 unidad" }, { nombre: "Redondo de ternera asado en lonchas muy finas", cantidad: "200 g" }, { nombre: "Caldo de carne (jus)", cantidad: "250 ml" }, { nombre: "Giardiniera (encurtido picante italiano)", cantidad: "3 cucharadas" }, { nombre: "Pimiento verde asado", cantidad: "½ unidad" }, { nombre: "Ajo, orégano y pimienta", cantidad: "al gusto" }],
     pasos: ["Calienta el caldo con ajo, orégano y pimienta y deja que reduzca 10 minutos.", "Sumerge las lonchas de ternera en el caldo caliente 1-2 minutos, sin que se sequen.", "Abre el pan y rellénalo con la carne escurrida.", "Corona con giardiniera y tiras de pimiento asado.", "Al estilo Chicago: moja medio sándwich en el jus antes de servir (\"dipped\")."],
   },
   {
     id: "bearTortilla", obra: "The Bear", tipo: "serie", plato: "Tortilla francesa con chips y cebollino", img: "huevo",
+    fotoEscena: "https://static.wikia.nocookie.net/the-bear/images/b/b3/S02E09.jpg/revision/latest/scale-to-width-down/900?cb=20230628215758",
     escena: "La tortilla que Sydney prepara para Natalie en la 2ª temporada: queso Boursin dentro y patatas chips machacadas por encima.",
     ingredientes: [{ nombre: "Huevos", cantidad: "3 unidades" }, { nombre: "Queso crema con hierbas (tipo Boursin)", cantidad: "2 cucharadas" }, { nombre: "Patatas chips de crema y cebolla", cantidad: "1 puñado" }, { nombre: "Cebollino picado", cantidad: "1 cucharada" }, { nombre: "Mantequilla", cantidad: "1 nuez" }],
     pasos: ["Bate los huevos y cuélalos para una textura extrafina.", "Cuájalos a fuego muy suave con la mantequilla, removiendo sin parar: no deben dorarse.", "Antes de cerrar la tortilla, reparte el queso por el centro.", "Enróllala con cuidado, en forma de puro.", "Píntala con mantequilla y termina con las chips machacadas y el cebollino."],
   },
   {
     id: "ratatouille", obra: "Ratatouille", tipo: "peli", plato: "Ratatouille (confit byaldi)", img: "verdura",
+    fotoPlato: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Confit_byaldi_1.jpg/960px-Confit_byaldi_1.jpg",
     escena: "El plato que Rémy sirve al crítico Anton Ego y que le devuelve de golpe a su infancia.",
     ingredientes: [{ nombre: "Calabacín", cantidad: "1 unidad" }, { nombre: "Berenjena", cantidad: "1 unidad" }, { nombre: "Tomate pera", cantidad: "3 unidades" }, { nombre: "Pimiento rojo asado", cantidad: "1 unidad" }, { nombre: "Salsa de tomate", cantidad: "200 g" }, { nombre: "Aceite de oliva y tomillo", cantidad: "al gusto" }],
     pasos: ["Corta el calabacín, la berenjena y el tomate en rodajas muy finas.", "Extiende la salsa de tomate con el pimiento triturado en la base de una fuente.", "Coloca las rodajas en abanico, alternando colores.", "Riega con aceite, sal y tomillo, y cubre con papel de horno.", "Hornea 45 minutos a 160 °C. Sirve con un cordón de aceite, como en la película."],
   },
   {
     id: "chefCubano", obra: "Chef", tipo: "peli", plato: "Sándwich cubano", img: "tostada",
+    fotoPlato: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Cubano_sandwich.jpg/960px-Cubano_sandwich.jpg",
     escena: "El sándwich con el que Carl Casper recorre EE. UU. en su food truck 'El Jefe' junto a su hijo.",
     ingredientes: [{ nombre: "Pan cubano o chapata", cantidad: "1 unidad" }, { nombre: "Cerdo asado en lonchas", cantidad: "120 g" }, { nombre: "Jamón cocido", cantidad: "2 lonchas" }, { nombre: "Queso suizo (emmental)", cantidad: "2 lonchas" }, { nombre: "Pepinillos en rodajas", cantidad: "4 unidades" }, { nombre: "Mostaza y mantequilla", cantidad: "al gusto" }],
     pasos: ["Unta el pan con mostaza por dentro y mantequilla por fuera.", "Monta capas de cerdo, jamón, queso y pepinillos.", "Prénsalo en sartén o plancha con peso encima, 3-4 minutos por lado.", "Está listo cuando el queso funde y el pan cruje.", "Córtalo en diagonal, como manda Casper."],
   },
   {
     id: "pulpBurger", obra: "Pulp Fiction", tipo: "peli", plato: "Hamburguesa Big Kahuna", img: "carne",
+    fotoEscena: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Big_Kahuna_Burger.png/960px-Big_Kahuna_Burger.png",
+    fotoPlato: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Pineapple_bacon_cheeseburger.jpg/960px-Pineapple_bacon_cheeseburger.jpg",
     escena: "\"Mmm, esto sí que es una hamburguesa sabrosa\": la hamburguesa hawaiana que Jules prueba en el apartamento de Brett.",
     ingredientes: [{ nombre: "Carne picada de ternera", cantidad: "180 g" }, { nombre: "Pan de hamburguesa brioche", cantidad: "1 unidad" }, { nombre: "Queso cheddar", cantidad: "1 loncha" }, { nombre: "Piña a la plancha", cantidad: "1 rodaja" }, { nombre: "Lechuga, tomate y cebolla morada", cantidad: "al gusto" }, { nombre: "Salsa barbacoa", cantidad: "1 cucharada" }],
     pasos: ["Forma la hamburguesa sin apretar demasiado y salpimienta.", "Hazla a fuego fuerte 3 minutos por lado; funde el cheddar encima al final.", "Marca la rodaja de piña en la misma sartén.", "Monta: pan, salsa, lechuga, carne con queso, piña, tomate y cebolla.", "Acompáñala de un buen refresco... aunque no sea un batido de 5 dólares."],
   },
   {
     id: "padrinoSalsa", obra: "El Padrino", tipo: "peli", plato: "Espaguetis con la salsa de Clemenza", img: "pasta",
+    fotoPlato: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Spaghetti_and_meatballs_1.jpg/960px-Spaghetti_and_meatballs_1.jpg",
     escena: "Clemenza enseña a Michael a cocinar para veinte: \"Primero doras el ajo, luego echas el tomate...\".",
     ingredientes: [{ nombre: "Espaguetis", cantidad: "100 g" }, { nombre: "Tomate triturado", cantidad: "400 g" }, { nombre: "Albóndigas pequeñas", cantidad: "6 unidades" }, { nombre: "Salchichas frescas", cantidad: "2 unidades" }, { nombre: "Ajo", cantidad: "2 dientes" }, { nombre: "Vino tinto y una pizca de azúcar", cantidad: "un chorrito" }],
     pasos: ["Dora el ajo laminado en aceite, sin quemarlo.", "Añade el tomate y deja que hierva suave.", "Incorpora las albóndigas y las salchichas doradas.", "Echa el chorrito de vino y la pizca de azúcar, el truco de Clemenza.", "Cuece 30 minutos a fuego lento y sirve sobre los espaguetis."],
   },
   {
     id: "rossSandwich", obra: "Friends", tipo: "serie", plato: "El sándwich de Ross (con 'jugosín')", img: "tostada",
+    fotoEscena: "https://static.wikia.nocookie.net/friends/images/5/5b/TOWRoss%27Sandwich.png/revision/latest?cb=20180304183345",
     escena: "El sándwich de sobras de Acción de Gracias que le roban a Ross en el trabajo: su secreto es la rebanada central empapada en salsa.",
     ingredientes: [{ nombre: "Pan de molde", cantidad: "3 rebanadas" }, { nombre: "Pavo asado en lonchas", cantidad: "120 g" }, { nombre: "Relleno de pan y verduras (stuffing)", cantidad: "3 cucharadas" }, { nombre: "Salsa de carne (gravy)", cantidad: "100 ml" }, { nombre: "Arándanos en salsa", cantidad: "1 cucharada" }],
     pasos: ["Empapa la rebanada central en la salsa caliente: es el famoso 'jugosín' (moist maker).", "Monta la base con pavo y relleno.", "Coloca encima la rebanada empapada.", "Añade más pavo y los arándanos.", "Cierra el sándwich y córtalo por la mitad. Y que nadie te lo quite de la nevera del trabajo."],
   },
   {
     id: "pollosHermanos", obra: "Breaking Bad", tipo: "serie", plato: "Pollo frito Los Pollos Hermanos", img: "pollo",
+    fotoEscena: "https://static.wikia.nocookie.net/breakingbad/images/e/ed/Los_Pollos_Hermanos.jpg/revision/latest?cb=20100622005212",
     escena: "El pollo crujiente del restaurante de Gus Fring, la tapadera más famosa de Albuquerque.",
     ingredientes: [{ nombre: "Contramuslos de pollo", cantidad: "4 unidades" }, { nombre: "Leche + zumo de ½ limón (suero casero)", cantidad: "250 ml" }, { nombre: "Harina", cantidad: "150 g" }, { nombre: "Pimentón, ajo en polvo y cayena", cantidad: "1 cucharadita de cada" }, { nombre: "Aceite para freír", cantidad: "abundante" }],
     pasos: ["Mezcla la leche con el limón y marina el pollo 1 hora en la nevera.", "Mezcla la harina con las especias y sal.", "Escurre el pollo y rebózalo presionando para que la costra agarre.", "Fríe a 170 °C unos 14 minutos, hasta que esté dorado y hecho por dentro.", "Escurre sobre rejilla para que quede crujiente, digno de Gus Fring."],
@@ -512,6 +528,7 @@ const OBJETIVOS = [
 const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
 const BANNER_CINE = U("1489599849927-2ee91cede3ba"); // butacas de cine; si falla, onImgError pone el degradado de marca
+const BANNER_RECETARIO = U("1466637574441-749b8f19452f"); // mesa con ingredientes, cabecera del recetario
 
 /* Migra un plan guardado con el formato antiguo (app con entrenamientos)
    al formato actual. Los objetivos antiguos se traducen a los nuevos y
@@ -564,9 +581,11 @@ export default function App() {
 
   const retomarPlan = () => { if (planGuardado) { setDatos(planGuardado); setFase("plan"); } };
 
-  // Sección "cine": recuerda desde qué pantalla se abrió para volver a ella.
-  const [cineDesde, setCineDesde] = useState("hero");
-  const abrirCine = () => { setCineDesde(fase); setFase("cine"); };
+  // Secciones de catálogo (recetario y cine): recuerdan desde qué pantalla se
+  // abrieron para volver a ella; saltar de una sección a otra no pisa ese origen.
+  const [seccionDesde, setSeccionDesde] = useState("hero");
+  const esSeccion = (f) => f === "cine" || f === "recetario";
+  const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
@@ -582,11 +601,12 @@ export default function App() {
         @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; } }
         .exwrap:hover .eximg { transform: scale(1.06); }
       `}</style>
-      {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} onCine={abrirCine} />}
+      {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} onIrSeccion={irSeccion} />}
       {fase === "form" && <Formulario datos={datos} set={set} paso={paso} setPaso={setPaso} onFinish={() => setFase("scan")} onBack={() => setFase("hero")} />}
       {fase === "scan" && <Scan onDone={() => setFase("plan")} />}
-      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} onCine={abrirCine} />}
-      {fase === "cine" && <Cine onBack={() => setFase(cineDesde)} onLogin={() => setAuthAbierto(true)} />}
+      {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "cine" && <Cine onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "recetario" && <Recetario onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
   );
@@ -672,7 +692,20 @@ function CuentaChip({ onLogin, oscuro }) {
   );
 }
 
-function Hero({ onStart, onLogin, planGuardado, onRetomar, onCine }) {
+// Botones de navegación a las secciones de catálogo, reutilizados en todas las
+// cabeceras. `actual` oculta la sección en la que ya estás.
+function NavSecciones({ onIrSeccion, actual = null }) {
+  const items = [["recetario", "📖 Recetario"], ["cine", "🎬 Cine y series"]];
+  return (
+    <>
+      {items.filter(([id]) => id !== actual).map(([id, t]) => (
+        <button key={id} onClick={() => onIrSeccion(id)} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, backdropFilter: "blur(6px)" }}>{t}</button>
+      ))}
+    </>
+  );
+}
+
+function Hero({ onStart, onLogin, planGuardado, onRetomar, onIrSeccion }) {
   return (
     <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
@@ -682,7 +715,10 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar, onCine }) {
       </div>
       <header style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 28px", gap: 12 }}>
         <div style={{ ...DF, fontWeight: 800, fontSize: 24, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-        <CuentaChip onLogin={onLogin} oscuro />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+          <NavSecciones onIrSeccion={onIrSeccion} />
+          <CuentaChip onLogin={onLogin} oscuro />
+        </div>
       </header>
       <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 28px 9vh", maxWidth: 1100 }}>
         <div style={{ fontSize: 13, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 20, fontWeight: 700 }}>Tu plan. Tu mesa. Tus reglas.</div>
@@ -694,7 +730,8 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar, onCine }) {
           {planGuardado && (
             <button onClick={onRetomar} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>↩ Continuar con mi plan guardado</button>
           )}
-          <button onClick={onCine} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>🎬 Recetas de cine y series</button>
+          <button onClick={() => onIrSeccion("recetario")} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>📖 Explorar el recetario</button>
+          <button onClick={() => onIrSeccion("cine")} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>🎬 Recetas de cine y series</button>
         </div>
         <div style={{ display: "flex", gap: 48, marginTop: 60, flexWrap: "wrap" }}>
           {[["4", "objetivos"], ["7 días", "de dieta"], [`${RECETAS.length}`, "recetas con foto"]].map(([n, t]) => (
@@ -846,7 +883,7 @@ function Scan({ onDone }) {
   );
 }
 
-function Plan({ datos, onReset, onLogin, onCine }) {
+function Plan({ datos, onReset, onLogin, onIrSeccion }) {
   const [diaDieta, setDiaDieta] = useState(0);
   const [recetaAbierta, setRecetaAbierta] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
@@ -991,7 +1028,7 @@ function Plan({ datos, onReset, onLogin, onCine }) {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
             {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700 }}>✓ Guardado</span>}
             <button onClick={descargarPDF} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "8px 18px", fontSize: 13, boxShadow: "0 6px 22px rgba(255,77,46,.35)" }}>⬇ Descargar PDF</button>
-            <button onClick={onCine} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>🎬 Cine</button>
+            <NavSecciones onIrSeccion={onIrSeccion} />
             <button onClick={onReset} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>↺ Empezar de nuevo</button>
             <CuentaChip onLogin={onLogin} oscuro />
           </div>
@@ -1062,28 +1099,7 @@ function Plan({ datos, onReset, onLogin, onCine }) {
                   {abierto && (
                     <div className="fadeUp" style={{ padding: "0 16px 18px", display: "grid", gridTemplateColumns: "minmax(140px,200px) 1fr", gap: 18, alignItems: "start" }}>
                       <img src={img} alt={c.receta.nombre} onError={onImgError} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
-                      <div>
-                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Ingredientes</div>
-                        <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
-                          {c.receta.ingredientes.map((ing) => (
-                            <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#D6D9DE" }}>
-                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 13, flexShrink: 0, minWidth: 74 }}>{ing.cantidad}</span>{ing.nombre}
-                            </li>
-                          ))}
-                        </ul>
-                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "18px 0 10px" }}>Modo de elaboración</div>
-                        <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
-                          {c.receta.pasos.map((p, pi) => (
-                            <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
-                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
-                            </li>
-                          ))}
-                        </ol>
-                        <a href={youtubeUrl(c.receta.nombre)} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.05)", border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 14, color: C.text }}>
-                          <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
-                          Ver vídeo de la receta en YouTube
-                        </a>
-                      </div>
+                      <DetalleReceta ingredientes={c.receta.ingredientes} pasos={c.receta.pasos} youtube={youtubeUrl(c.receta.nombre)} />
                     </div>
                   )}
                 </div>
@@ -1097,89 +1113,188 @@ function Plan({ datos, onReset, onLogin, onCine }) {
   );
 }
 
+// Bloque de ingredientes + modo de elaboración + enlace a YouTube, común a las
+// fichas del plan, del recetario y de la sección de cine.
+function DetalleReceta({ ingredientes, pasos, youtube }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Ingredientes</div>
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
+        {ingredientes.map((ing) => (
+          <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#D6D9DE" }}>
+            <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 13, flexShrink: 0, minWidth: 74 }}>{ing.cantidad}</span>{ing.nombre}
+          </li>
+        ))}
+      </ul>
+      <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "18px 0 10px" }}>Modo de elaboración</div>
+      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+        {pasos.map((p, pi) => (
+          <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
+            <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
+          </li>
+        ))}
+      </ol>
+      <a href={youtube} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.05)", border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 14, color: C.text }}>
+        <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
+        Ver vídeo de la receta en YouTube
+      </a>
+    </div>
+  );
+}
+
+// Cabecera con banner que comparten las secciones de catálogo (recetario y cine).
+function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion, actual }) {
+  return (
+    <div style={{ position: "relative", height: 300, overflow: "hidden" }}>
+      <img src={banner} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
+      <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
+        <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+          <button onClick={onBack} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>← Volver</button>
+          <NavSecciones onIrSeccion={onIrSeccion} actual={actual} />
+          <CuentaChip onLogin={onLogin} oscuro />
+        </div>
+      </header>
+      <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
+        <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>{kicker}</div>
+        <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{titulo}</h1>
+      </div>
+    </div>
+  );
+}
+
+// Ficha expandible de receta, compartida por el recetario y la sección de cine.
+// `r` es un modelo unificado: etiqueta pequeña, nombre, kcal y fotos opcionales
+// (escena de la obra y plato real) más el detalle (ingredientes, pasos, youtube).
+function FichaReceta({ r, abierto, onToggle, delay = 0 }) {
+  const generica = U(FOODIMG[r.img] || FOODIMG.otro, 600);
+  const thumb = r.fotoEscena || r.fotoPlato || generica;
+  const plato = r.fotoPlato || generica;
+  // Las fotos externas pueden caerse: se prueba primero la genérica del plato
+  // y, si también falla, onImgError pinta el degradado de marca.
+  const conRespaldo = (e) => { const t = e.currentTarget; if (t.src !== generica) t.src = generica; else onImgError(e); };
+  return (
+    <div className="exwrap fadeUp" style={{ animationDelay: `${delay}ms`, background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
+      <button onClick={onToggle} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
+        <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
+          <img className="eximg" src={thumb} alt={r.nombre} loading="lazy" onError={conRespaldo} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
+        </div>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase" }}>{r.etiqueta}</div>
+            <div style={{ ...DF, fontWeight: 800, fontSize: 17, marginTop: 4, lineHeight: 1.3 }}>{r.nombre}</div>
+          </div>
+          {r.kcal != null && (
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 17 }}>~{r.kcal}</div>
+              <div style={{ fontSize: 11, color: C.dim }}>kcal</div>
+            </div>
+          )}
+          <div style={{ color: C.dim, fontSize: 18 }}>{abierto ? "−" : "+"}</div>
+        </div>
+      </button>
+      {abierto && (
+        <div className="fadeUp" style={{ padding: "0 16px 18px" }}>
+          {r.escena && (r.fotoEscena ? (
+            <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", marginBottom: 16, border: `1px solid ${C.line}` }}>
+              <img src={r.fotoEscena} alt={r.nombre} loading="lazy" onError={onImgError} style={{ width: "100%", aspectRatio: "21/9", objectFit: "cover", display: "block" }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 35%, rgba(10,11,13,.92))", display: "flex", alignItems: "flex-end", padding: "14px 16px" }}>
+                <p style={{ margin: 0, color: "#E8EAEE", fontSize: 13.5, lineHeight: 1.55, fontStyle: "italic", textShadow: "0 1px 8px rgba(0,0,0,.9)" }}>{r.escena}</p>
+              </div>
+            </div>
+          ) : (
+            <p style={{ color: C.dim, fontSize: 14, lineHeight: 1.6, fontStyle: "italic", margin: "0 0 16px", borderLeft: `3px solid ${C.hot1}`, paddingLeft: 12 }}>{r.escena}</p>
+          ))}
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(140px,200px) 1fr", gap: 18, alignItems: "start" }}>
+            <img src={plato} alt={r.nombre} loading="lazy" onError={conRespaldo} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
+            <DetalleReceta ingredientes={r.ingredientes} pasos={r.pasos} youtube={r.youtube} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Adapta una receta de cine al modelo unificado que consume FichaReceta.
+const fichaDeCine = (r) => ({
+  id: r.id, nombre: r.plato, img: r.img, escena: r.escena, fotoEscena: r.fotoEscena, fotoPlato: r.fotoPlato,
+  etiqueta: `🎬 ${r.obra} · ${r.tipo === "serie" ? "Serie" : "Película"}`,
+  ingredientes: r.ingredientes, pasos: r.pasos, youtube: youtubeUrl(`${r.plato} ${r.obra}`),
+});
+
 // Sección "Cocina de película": recetas icónicas de series y pelis, solo para
 // disfrutar. Independiente del plan semanal y del PDF.
-function Cine({ onBack, onLogin }) {
+function Cine({ onBack, onLogin, onIrSeccion }) {
   const [filtro, setFiltro] = useState("todas"); // "todas" | "serie" | "peli"
   const [abierta, setAbierta] = useState<string | null>(null);
   const lista = RECETAS_CINE.filter((r) => filtro === "todas" || r.tipo === filtro);
   return (
     <div>
-      <div style={{ position: "relative", height: 300, overflow: "hidden" }}>
-        <img src={BANNER_CINE} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
-        <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
-          <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-            <button onClick={onBack} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>← Volver</button>
-            <CuentaChip onLogin={onLogin} oscuro />
-          </div>
-        </header>
-        <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
-          <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>Fuera del plan · Solo por placer</div>
-          <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>Cocina de <span style={gradText}>película</span></h1>
-        </div>
-      </div>
+      <CabeceraSeccion banner={BANNER_CINE} kicker="Fuera del plan · Solo por placer" titulo={<>Cocina de <span style={gradText}>película</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="cine" />
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 80px" }}>
-        <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Platos míticos de tus series y películas favoritas, con su receta completa para hacerlos en casa. Son un capricho: no cuentan para tu plan semanal ni salen en el PDF.</p>
+        <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Platos míticos de tus series y películas favoritas, con la imagen de la obra y su receta completa para hacerlos en casa. Son un capricho: no cuentan para tu plan semanal ni salen en el PDF.</p>
         <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
           {[["todas", "Todas"], ["serie", "Series"], ["peli", "Películas"]].map(([id, t]) => (
             <button key={id} onClick={() => { setFiltro(id); setAbierta(null); }} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${filtro === id ? C.hot1 : C.line}`, color: filtro === id ? "#0A0B0D" : C.dim, ...(filtro === id ? grad : { background: C.panel }) }}>{t}</button>
           ))}
         </div>
         <div style={{ display: "grid", gap: 14 }}>
-          {lista.map((r, i) => {
-            const abierto = abierta === r.id;
-            const img = U(FOODIMG[r.img], 600);
-            return (
-              <div key={r.id} className="exwrap fadeUp" style={{ animationDelay: `${i * 55}ms`, background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
-                <button onClick={() => setAbierta(abierto ? null : r.id)} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
-                  <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
-                    <img className="eximg" src={img} alt={r.plato} loading="lazy" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
-                  </div>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", minWidth: 0 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase" }}>🎬 {r.obra} · {r.tipo === "serie" ? "Serie" : "Película"}</div>
-                      <div style={{ ...DF, fontWeight: 800, fontSize: 17, marginTop: 4, lineHeight: 1.3 }}>{r.plato}</div>
-                    </div>
-                    <div style={{ color: C.dim, fontSize: 18 }}>{abierto ? "−" : "+"}</div>
-                  </div>
-                </button>
-                {abierto && (
-                  <div className="fadeUp" style={{ padding: "0 16px 18px" }}>
-                    <p style={{ color: C.dim, fontSize: 14, lineHeight: 1.6, fontStyle: "italic", margin: "0 0 16px", borderLeft: `3px solid ${C.hot1}`, paddingLeft: 12 }}>{r.escena}</p>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(140px,200px) 1fr", gap: 18, alignItems: "start" }}>
-                      <img src={img} alt={r.plato} onError={onImgError} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
-                      <div>
-                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Ingredientes</div>
-                        <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
-                          {r.ingredientes.map((ing) => (
-                            <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#D6D9DE" }}>
-                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 13, flexShrink: 0, minWidth: 74 }}>{ing.cantidad}</span>{ing.nombre}
-                            </li>
-                          ))}
-                        </ul>
-                        <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "18px 0 10px" }}>Modo de elaboración</div>
-                        <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
-                          {r.pasos.map((p, pi) => (
-                            <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
-                              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
-                            </li>
-                          ))}
-                        </ol>
-                        <a href={youtubeUrl(`${r.plato} ${r.obra}`)} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.05)", border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 14, color: C.text }}>
-                          <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
-                          Ver vídeo de la receta en YouTube
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {lista.map((r, i) => (
+            <FichaReceta key={r.id} r={fichaDeCine(r)} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={i * 55} />
+          ))}
         </div>
         <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>🍿 Estos platos son homenajes a sus series y películas: disfrútalos de vez en cuando, sin remordimientos. Tu plan semanal sigue intacto.</div>
+      </div>
+    </div>
+  );
+}
+
+// Recetario completo: todas las recetas de la app (plan + cine) con buscador
+// por nombre o ingrediente y filtro por categoría.
+const CATS_RECETARIO = [["todas", "Todas"], ["desayuno", "Desayunos"], ["comida", "Comidas"], ["cena", "Cenas"], ["snack", "Snacks"], ["cine", "🎬 De cine"]];
+const NOMBRE_CAT = { desayuno: "Desayuno", comida: "Comida", cena: "Cena", snack: "Snack" };
+
+function Recetario({ onBack, onLogin, onIrSeccion }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [cat, setCat] = useState("todas");
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const todas = useMemo(() => [
+    ...RECETAS.map((r) => ({ id: r.id, nombre: r.nombre, img: r.img, categoria: r.categoria, kcal: r.kcalAprox, etiqueta: NOMBRE_CAT[r.categoria], ingredientes: r.ingredientes, pasos: r.pasos, youtube: youtubeUrl(r.nombre) })),
+    ...RECETAS_CINE.map((r) => ({ ...fichaDeCine(r), categoria: "cine" })),
+  ], []);
+  const q = normalizar(busqueda.trim());
+  const lista = todas.filter((r) => (cat === "todas" || r.categoria === cat)
+    && (!q || normalizar(r.nombre).includes(q) || r.ingredientes.some((ing) => normalizar(ing.nombre).includes(q))));
+  return (
+    <div>
+      <CabeceraSeccion banner={BANNER_RECETARIO} kicker={`${todas.length} recetas · Todas con foto y elaboración`} titulo={<>El <span style={gradText}>recetario</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="recetario" />
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 80px" }}>
+        <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Todas las recetas de PULSO en un solo sitio. Búscalas por nombre o por ingrediente y ábrelas para ver sus cantidades y su elaboración paso a paso.</p>
+        <div className="fadeUp" style={{ position: "relative", marginBottom: 16 }}>
+          <span style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", fontSize: 16, pointerEvents: "none" }}>🔍</span>
+          <input value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setAbierta(null); }} placeholder="Busca por nombre o ingrediente: salmón, avena, sándwich…" aria-label="Buscar receta" style={{ width: "100%", boxSizing: "border-box", padding: "16px 20px 16px 50px", borderRadius: 999, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+          {CATS_RECETARIO.map(([id, t]) => (
+            <button key={id} onClick={() => { setCat(id); setAbierta(null); }} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${cat === id ? C.hot1 : C.line}`, color: cat === id ? "#0A0B0D" : C.dim, ...(cat === id ? grad : { background: C.panel }) }}>{t}</button>
+          ))}
+        </div>
+        <div style={{ color: C.dim, fontSize: 13, marginBottom: 14 }}>{lista.length === 1 ? "1 receta" : `${lista.length} recetas`}</div>
+        {lista.length === 0 ? (
+          <div className="fadeUp" style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "30px 22px", textAlign: "center" }}>
+            <div style={{ fontSize: 28 }}>🍽️</div>
+            <div style={{ ...DF, fontWeight: 800, fontSize: 18, marginTop: 8 }}>No hay recetas con esa búsqueda</div>
+            <p style={{ color: C.dim, fontSize: 14, margin: "6px 0 16px" }}>Prueba con otro nombre o ingrediente, o quita los filtros.</p>
+            <button onClick={() => { setBusqueda(""); setCat("todas"); }} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "10px 22px", fontSize: 14 }}>Ver todas las recetas</button>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 14 }}>
+            {lista.map((r, i) => (
+              <FichaReceta key={r.id} r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={Math.min(i, 8) * 45} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
