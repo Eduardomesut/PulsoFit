@@ -14,17 +14,28 @@ import {
    Imágenes: Unsplash (fuente libre) vía URL directa.
    ============================================================ */
 
+/* Paleta clara estilo Apple: los grises de apple.com (#F5F5F7 para paneles,
+   texto #1D1D1F, secundario #6E6E73) y el acento de marca en dos naranjas
+   próximos en tono para que el degradado sea suave, no estridente. */
 const C = {
-  bg: "#0A0B0D", panel: "#131519", panel2: "#1A1D22",
-  line: "#282C33", text: "#F6F5F2", dim: "#9CA3AE",
-  hot1: "#FF4D2E", hot2: "#FF9A3C",
+  bg: "#FFFFFF", panel: "#F5F5F7", panel2: "#E8E8ED",
+  line: "#E2E2E7", text: "#1D1D1F", dim: "#6E6E73",
+  hot1: "#F5501A", hot2: "#F98D1F",
 };
 const grad = { backgroundImage: `linear-gradient(90deg, ${C.hot1}, ${C.hot2})` };
 const gradText = { backgroundImage: `linear-gradient(90deg, ${C.hot1}, ${C.hot2})`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" };
-const DF = { fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", letterSpacing: "-0.03em" };
+const DF = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif", letterSpacing: "-0.03em" };
 // Imagen de reserva (degradado de marca) si alguna foto no carga: evita el icono de "imagen rota".
-const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#FF4D2E'/><stop offset='1' stop-color='#FF9A3C'/></linearGradient></defs><rect width='400' height='400' fill='#1A1D22'/><circle cx='200' cy='210' r='78' fill='url(#g)' opacity='0.28'/><circle cx='200' cy='210' r='40' fill='url(#g)' opacity='0.5'/></svg>`)}`;
+const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#F5501A'/><stop offset='1' stop-color='#F98D1F'/></linearGradient></defs><rect width='400' height='400' fill='#F5F5F7'/><circle cx='200' cy='210' r='78' fill='url(#g)' opacity='0.28'/><circle cx='200' cy='210' r='40' fill='url(#g)' opacity='0.5'/></svg>`)}`;
 const onImgError = (e) => { const t = e.currentTarget; if (t.src !== FALLBACK_IMG) t.src = FALLBACK_IMG; };
+
+/* Botones de acción principales, estilo Apple: píldora compacta de tamaño
+   uniforme. El primario lleva el degradado de marca con texto blanco;
+   el secundario es gris translúcido con blur. Las microinteracciones
+   (hover, presión) viven en las clases .btn-cta y button:active. */
+const btnBase = { border: "none", borderRadius: 980, fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", padding: "13px 28px", minWidth: "min(220px, 100%)", transition: "transform .18s ease, filter .18s ease, box-shadow .18s ease" };
+const btnPrimario = { ...btnBase, ...grad, color: "#fff", boxShadow: "0 4px 16px rgba(245,80,26,.25)" };
+const btnSecundario = { ...btnBase, background: "rgba(29,29,31,.07)", color: C.text, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" };
 
 const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
@@ -68,18 +79,40 @@ export default function App() {
   const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <style>{`
         @keyframes fadeUp { from { opacity:0; transform:translateY(26px);} to {opacity:1; transform:none;} }
         @keyframes kenburns { from { transform: scale(1);} to { transform: scale(1.12);} }
         @keyframes scanline { 0%{top:0%;} 100%{top:100%;} }
         .fadeUp { animation: fadeUp .6s ease both; }
-        button { cursor:pointer; font-family:inherit; }
-        button:focus-visible { outline:2px solid ${C.hot2}; outline-offset:3px; }
+        /* Microinteracciones tipo Apple: todo botón responde al hover y se
+           comprime ligeramente al pulsarlo; tarjetas e inputs devuelven
+           feedback suave (sombra al pasar, halo al enfocar). */
+        button { cursor:pointer; font-family:inherit; transition: background .18s ease, filter .18s ease, transform .18s ease, border-color .18s ease, box-shadow .18s ease, color .18s ease; }
+        button:active { transform: scale(.97); }
+        button:focus-visible { outline:2px solid ${C.hot1}; outline-offset:3px; }
+        .btn-cta:hover { filter: brightness(1.05); transform: translateY(-1px); }
+        .btn-cta:active { transform: scale(.97); }
+        .exwrap { transition: box-shadow .28s ease, border-color .18s ease; }
+        .exwrap:hover { box-shadow: 0 14px 34px rgba(0,0,0,.08); }
+        input[type=email], input[type=password], input[type=text], input:not([type]) { transition: border-color .2s ease, box-shadow .2s ease; }
+        input[type=email]:focus, input[type=password]:focus, input[type=text]:focus, input:not([type]):focus { outline: none; border-color: ${C.hot1} !important; box-shadow: 0 0 0 4px rgba(245,80,26,.12); }
         input[type=range]{ accent-color:${C.hot1}; }
         ::selection { background:${C.hot1}; color:#fff; }
-        @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; } }
+        @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; transition-duration:.01ms !important; } }
         .exwrap:hover .eximg { transform: scale(1.06); }
+        /* Navegación tipo Tesla: enlaces de texto planos que muestran una
+           pastilla translúcida al pasar el ratón. La cabecera vive siempre
+           sobre una foto (.sobre-foto → texto blanco, pastilla blanca);
+           el menú lateral es un panel claro (.sobre-claro → pastilla gris). */
+        .nav-item { background: transparent; border: none; color: inherit; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 980px; transition: background .2s ease; text-decoration: none; white-space: nowrap; }
+        .nav-item:hover, .nav-item.activo { background: rgba(23,26,32,.06); }
+        .sobre-foto .nav-item:hover, .sobre-foto .nav-item.activo { background: rgba(255,255,255,.16); backdrop-filter: blur(8px); }
+        .sobre-claro .nav-item:hover, .sobre-claro .nav-item.activo { background: rgba(23,26,32,.06); backdrop-filter: none; }
+        @media (max-width: 900px) { .nav-escritorio { display: none !important; } }
+        @media (min-width: 901px) { .nav-movil { display: none !important; } }
+        @keyframes menuIn { from { transform: translateX(100%); } to { transform: none; } }
+        @media (max-width: 600px) { .cta-fila { flex-direction: column; align-items: stretch; } }
       `}</style>
       {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} onIrSeccion={irSeccion} />}
       {fase === "form" && <Formulario datos={datos} set={set} paso={paso} setPaso={setPaso} onFinish={() => setFase("scan")} onBack={() => setFase("hero")} />}
@@ -119,8 +152,8 @@ function AuthModal({ onClose }) {
 
   const input = { width: "100%", padding: "14px 16px", borderRadius: 12, background: C.bg, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15, marginTop: 10 };
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: 20, zIndex: 100 }}>
-      <div onClick={(e) => e.stopPropagation()} className="fadeUp" style={{ width: "100%", maxWidth: 400, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 22, padding: 26 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(23,26,32,.45)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: 20, zIndex: 100 }}>
+      <div onClick={(e) => e.stopPropagation()} className="fadeUp" style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 22, padding: 26, boxShadow: "0 24px 60px rgba(0,0,0,.16)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ ...DF, fontWeight: 800, fontSize: 22 }}>{modo === "login" ? "Iniciar sesión" : "Crear cuenta"}</div>
           <button onClick={onClose} aria-label="Cerrar" style={{ background: "none", border: "none", color: C.dim, fontSize: 24, lineHeight: 1 }}>×</button>
@@ -131,7 +164,7 @@ function AuthModal({ onClose }) {
           <input style={input} type="password" placeholder="Contraseña (mín. 6 caracteres)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={modo === "login" ? "current-password" : "new-password"} />
           {error && <div style={{ color: C.hot1, fontSize: 13, marginTop: 12 }}>{error}</div>}
           {aviso && <div style={{ color: C.hot2, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>{aviso}</div>}
-          <button type="submit" disabled={cargando} style={{ ...grad, width: "100%", marginTop: 18, border: "none", color: "#0A0B0D", fontWeight: 800, fontSize: 15, padding: 15, borderRadius: 999, opacity: cargando ? 0.6 : 1 }}>
+          <button className="btn-cta" type="submit" disabled={cargando} style={{ ...btnPrimario, width: "100%", marginTop: 18, fontSize: 15, padding: 14, opacity: cargando ? 0.6 : 1 }}>
             {cargando ? "Un momento…" : modo === "login" ? "Entrar" : "Registrarme"}
           </button>
         </form>
@@ -155,33 +188,69 @@ function traducirError(msg) {
   return "No se ha podido completar. Inténtalo de nuevo.";
 }
 
-// Chip de sesión reutilizable en las cabeceras (login / usuario).
-function CuentaChip({ onLogin, oscuro }) {
+// Sesión como enlaces de texto planos, al estilo del resto de la navegación.
+// `vertical` la adapta a la lista del menú lateral.
+function CuentaChip({ onLogin, vertical = false }) {
   const { enabled, ready, user, signOut } = useAuth();
   if (!enabled || !ready) return null;
-  const base = { borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700 };
-  if (!user) return (
-    <button onClick={onLogin} style={{ ...base, ...grad, border: "none", color: "#0A0B0D" }}>Iniciar sesión</button>
-  );
+  const item = vertical ? { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" } : {};
+  if (!user) return <button className="nav-item" onClick={onLogin} style={item}>Cuenta</button>;
   const nombre = (user.email || "").split("@")[0];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ fontSize: 13, color: oscuro ? C.text : C.text, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>👤 {nombre}</span>
-      <button onClick={() => signOut()} style={{ ...base, background: oscuro ? "rgba(0,0,0,.4)" : C.panel, border: `1px solid ${C.line}`, color: C.text }}>Salir</button>
-    </div>
+    <>
+      <span className="nav-item" style={{ ...item, color: C.dim, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>{nombre}</span>
+      <button className="nav-item" onClick={() => signOut()} style={item}>Salir</button>
+    </>
   );
 }
 
-// Botones de navegación a las secciones de catálogo, reutilizados en todas las
-// cabeceras. `actual` oculta la sección en la que ya estás.
-function NavSecciones({ onIrSeccion, actual = null }) {
-  const items = [["recetario", "📖 Recetario"], ["cine", "🎬 Cine y series"]];
+// Cabecera compartida por todas las pantallas, estilo Tesla: logo a la izquierda,
+// enlaces de texto centrados (escritorio), acciones contextuales a la derecha y
+// un botón "Menú" que abre el panel lateral en pantallas estrechas.
+// `onInicio` hace clicable el logo; `actual` resalta la sección activa.
+const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"]];
+function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const logo = <span style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></span>;
   return (
-    <>
-      {items.filter(([id]) => id !== actual).map(([id, t]) => (
-        <button key={id} onClick={() => onIrSeccion(id)} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, backdropFilter: "blur(6px)" }}>{t}</button>
-      ))}
-    </>
+    <header className="sobre-foto" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", gap: 8, padding: "14px 20px", color: "#fff" }}>
+      {onInicio
+        ? <button className="nav-item" onClick={onInicio} aria-label="Ir al inicio" style={{ padding: "6px 10px" }}>{logo}</button>
+        : <div style={{ padding: "6px 10px" }}>{logo}</div>}
+      <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
+        {NAV_LINKS.map(([id, t]) => (
+          <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={() => onIrSeccion(id)}>{t}</button>
+        ))}
+      </nav>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+        {acciones}
+        <span className="nav-escritorio" style={{ display: "flex", alignItems: "center", gap: 4 }}><CuentaChip onLogin={onLogin} /></span>
+        <button className="nav-item nav-movil" onClick={() => setMenuAbierto(true)}>Menú</button>
+      </div>
+      {menuAbierto && (
+        <MenuLateral onCerrar={() => setMenuAbierto(false)} onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onInicio} actual={actual} />
+      )}
+    </header>
+  );
+}
+
+// Panel lateral deslizante (menú móvil), estilo Tesla: lista vertical de
+// enlaces planos sobre un panel con blur que entra desde la derecha.
+function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
+  const ir = (fn) => () => { onCerrar(); fn(); };
+  const item = { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" };
+  return (
+    <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 90 }}>
+      <div className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderLeft: `1px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4, animation: "menuIn .28s ease both" }}>
+        <button className="nav-item" onClick={onCerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
+        {onInicio && <button className="nav-item" onClick={ir(onInicio)} style={item}>Inicio</button>}
+        {NAV_LINKS.map(([id, t]) => (
+          <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={item}>{t}</button>
+        ))}
+        <div style={{ height: 1, background: C.line, margin: "10px 4px" }} />
+        <CuentaChip onLogin={ir(onLogin)} vertical />
+      </div>
+    </div>
   );
 }
 
@@ -190,35 +259,30 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar, onIrSeccion }) {
     <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
         <img src={HERO_IMG} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", animation: "kenburns 18s ease-out both" }} />
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(10,11,13,.55) 0%, rgba(10,11,13,.35) 40%, rgba(10,11,13,.92) 100%)` }} />
-        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(900px 480px at 78% 12%, rgba(255,77,46,.28), transparent 62%)` }} />
+        {/* La foto queda arriba (texto blanco) y se funde en blanco hacia la
+            zona de CTAs y cifras, que usa texto oscuro: transición tipo Tesla. */}
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(10,11,13,.55) 0%, rgba(10,11,13,.28) 42%, rgba(255,255,255,.88) 80%, #FFFFFF 100%)` }} />
+        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(900px 480px at 78% 12%, rgba(245,80,26,.16), transparent 62%)` }} />
       </div>
-      <header style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 28px", gap: 12 }}>
-        <div style={{ ...DF, fontWeight: 800, fontSize: 24, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-          <NavSecciones onIrSeccion={onIrSeccion} />
-          <CuentaChip onLogin={onLogin} oscuro />
+      <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} />
+      <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", textAlign: "center", padding: "16vh 24px 0", color: "#fff", textShadow: "0 1px 22px rgba(0,0,0,.45)" }}>
+        <div style={{ fontSize: 12, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 18, fontWeight: 700 }}>Tu plan. Tu mesa. Tus reglas.</div>
+        <h1 style={{ ...DF, fontSize: "clamp(42px, 8vw, 96px)", fontWeight: 800, lineHeight: 1, margin: 0 }}>Come con <span style={{ ...gradText, textShadow: "none" }}>intención.</span></h1>
+        <p style={{ color: "#F1F2F4", fontSize: 17, maxWidth: 560, lineHeight: 1.6, marginTop: 22 }}>Dinos tu objetivo, tus gustos y tus alergias. En segundos generamos tu semana de comidas completa, con cada receta ilustrada paso a paso.</p>
+      </main>
+      <div className="fadeUp" style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 30, padding: "40px 24px 6vh" }}>
+        <div className="cta-fila" style={{ display: "flex", gap: 14, justifyContent: "center", width: "100%", maxWidth: 600 }}>
+          <button className="btn-cta" onClick={onStart} style={btnPrimario}>Crear mi plan</button>
+          {planGuardado
+            ? <button className="btn-cta" onClick={onRetomar} style={btnSecundario}>Continuar con mi plan</button>
+            : <button className="btn-cta" onClick={() => onIrSeccion("recetario")} style={btnSecundario}>Explorar el recetario</button>}
         </div>
-      </header>
-      <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 28px 9vh", maxWidth: 1100 }}>
-        <div style={{ fontSize: 13, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 20, fontWeight: 700 }}>Tu plan. Tu mesa. Tus reglas.</div>
-        <h1 style={{ ...DF, fontSize: "clamp(46px, 9vw, 118px)", fontWeight: 800, lineHeight: 0.95, margin: 0 }}>Come con<br /><span style={gradText}>intención.</span></h1>
-        <p style={{ color: "#D7DADF", fontSize: 18, maxWidth: 540, lineHeight: 1.6, marginTop: 26 }}>Dinos tu objetivo, tus gustos y tus alergias. En segundos generamos tu semana de comidas completa, con cada receta ilustrada, sus ingredientes y su modo de elaboración paso a paso.</p>
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-          <button onClick={onStart} style={{ ...grad, marginTop: 34, border: "none", color: "#0A0B0D", fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: "19px 56px", borderRadius: 999, boxShadow: "0 10px 44px rgba(255,77,46,.4)", transition: "transform .15s" }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>CREAR MI PLAN GRATIS →</button>
-          {planGuardado && (
-            <button onClick={onRetomar} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>↩ Continuar con mi plan guardado</button>
-          )}
-          <button onClick={() => onIrSeccion("recetario")} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>📖 Explorar el recetario</button>
-          <button onClick={() => onIrSeccion("cine")} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>🎬 Recetas de cine y series</button>
-        </div>
-        <div style={{ display: "flex", gap: 48, marginTop: 60, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 36, flexWrap: "wrap", justifyContent: "center" }}>
           {[["4", "objetivos"], ["7 días", "de dieta"], [`${RECETAS.length}`, "recetas con foto"]].map(([n, t]) => (
-            <div key={t}><div style={{ ...DF, fontSize: 32, fontWeight: 800 }}>{n}</div><div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3 }}>{t}</div></div>
+            <div key={t} style={{ textAlign: "center" }}><div style={{ ...DF, fontSize: 20, fontWeight: 800 }}>{n}</div><div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>{t}</div></div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -257,9 +321,9 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
               {OBJETIVOS.map((o) => {
                 const activo = datos.objetivo === o.id;
                 return (
-                  <button key={o.id} onClick={() => set("objetivo", o.id)} style={{ position: "relative", height: 200, borderRadius: 20, overflow: "hidden", border: `2px solid ${activo ? C.hot1 : "transparent"}`, padding: 0, textAlign: "left", boxShadow: activo ? "0 10px 40px rgba(255,77,46,.3)" : "none", transition: "border-color .15s" }}>
+                  <button key={o.id} onClick={() => set("objetivo", o.id)} style={{ position: "relative", height: 200, borderRadius: 20, overflow: "hidden", border: `2px solid ${activo ? C.hot1 : "transparent"}`, padding: 0, textAlign: "left", boxShadow: activo ? "0 10px 40px rgba(245,80,26,.22)" : "none", transition: "border-color .15s" }}>
                     <img src={o.img} alt="" onError={onImgError} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-                    <div style={{ position: "absolute", inset: 0, background: activo ? "linear-gradient(180deg, rgba(255,77,46,.25), rgba(10,11,13,.9))" : "linear-gradient(180deg, rgba(10,11,13,.15), rgba(10,11,13,.88))" }} />
+                    <div style={{ position: "absolute", inset: 0, background: activo ? "linear-gradient(180deg, rgba(245,80,26,.25), rgba(10,11,13,.9))" : "linear-gradient(180deg, rgba(10,11,13,.15), rgba(10,11,13,.88))" }} />
                     <div style={{ position: "absolute", left: 20, right: 20, bottom: 18 }}>
                       <div style={{ ...DF, fontWeight: 800, fontSize: 24, color: "#fff" }}>{o.titulo}</div>
                       <div style={{ color: "#D7DADF", fontSize: 13, marginTop: 4 }}>{o.desc}</div>
@@ -277,7 +341,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
             <p style={{ color: C.dim, marginBottom: 28 }}>Con esto calculamos tus calorías y macros exactos.</p>
             <div style={{ display: "flex", gap: 12, marginBottom: 26 }}>
               {["hombre", "mujer"].map((s) => (
-                <button key={s} onClick={() => set("sexo", s)} style={{ flex: 1, padding: 16, borderRadius: 14, textTransform: "capitalize", fontWeight: 700, fontSize: 16, color: C.text, background: datos.sexo === s ? "linear-gradient(135deg, rgba(255,77,46,.18), rgba(255,154,60,.08))" : C.panel, border: `1.5px solid ${datos.sexo === s ? C.hot1 : C.line}` }}>{s === "hombre" ? "♂ Hombre" : "♀ Mujer"}</button>
+                <button key={s} onClick={() => set("sexo", s)} style={{ flex: 1, padding: 16, borderRadius: 14, textTransform: "capitalize", fontWeight: 700, fontSize: 16, color: C.text, background: datos.sexo === s ? "linear-gradient(135deg, rgba(245,80,26,.12), rgba(249,141,31,.06))" : C.panel, border: `1.5px solid ${datos.sexo === s ? C.hot1 : C.line}` }}>{s === "hombre" ? "♂ Hombre" : "♀ Mujer"}</button>
               ))}
             </div>
             {[["edad", "Edad", 14, 80, "años"], ["peso", "Peso", 40, 160, "kg"], ["altura", "Altura", 140, 210, "cm"]].map(([k, label, min, max, u]) => (
@@ -297,7 +361,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
             <p style={{ color: C.dim, marginBottom: 28 }}>Todas las recetas de tu plan la respetarán.</p>
             <div style={{ display: "grid", gap: 12 }}>
               {TIPOS_DIETA.map((t) => (
-                <button key={t.id} onClick={() => set("tipoDieta", t.id)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.tipoDieta === t.id ? "linear-gradient(135deg, rgba(255,77,46,.18), rgba(255,154,60,.08))" : C.panel, border: `1.5px solid ${datos.tipoDieta === t.id ? C.hot1 : C.line}` }}>
+                <button key={t.id} onClick={() => set("tipoDieta", t.id)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.tipoDieta === t.id ? "linear-gradient(135deg, rgba(245,80,26,.12), rgba(249,141,31,.06))" : C.panel, border: `1.5px solid ${datos.tipoDieta === t.id ? C.hot1 : C.line}` }}>
                   <div style={{ ...DF, fontWeight: 800, fontSize: 17 }}>{t.titulo}</div>
                   <div style={{ color: C.dim, fontSize: 13, marginTop: 3 }}>{t.desc}</div>
                 </button>
@@ -330,7 +394,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
             <p style={{ color: C.dim, marginBottom: 28 }}>Repartiremos tus calorías entre ellas.</p>
             <div style={{ display: "grid", gap: 12 }}>
               {[3, 4, 5].map((n) => (
-                <button key={n} onClick={() => set("comidasDia", n)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.comidasDia === n ? "linear-gradient(135deg, rgba(255,77,46,.18), rgba(255,154,60,.08))" : C.panel, border: `1.5px solid ${datos.comidasDia === n ? C.hot1 : C.line}` }}>
+                <button key={n} onClick={() => set("comidasDia", n)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.comidasDia === n ? "linear-gradient(135deg, rgba(245,80,26,.12), rgba(249,141,31,.06))" : C.panel, border: `1.5px solid ${datos.comidasDia === n ? C.hot1 : C.line}` }}>
                   <div style={{ ...DF, fontWeight: 800, fontSize: 22 }}>{n} <span style={{ fontSize: 13, fontWeight: 400, color: C.dim }}>comidas</span></div>
                   <div style={{ color: C.dim, fontSize: 13, marginTop: 3 }}>{REPARTO[n].map((f) => f.nombre).join(" · ")}</div>
                 </button>
@@ -339,7 +403,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
           </>
         )}
       </div>
-      <button onClick={next} disabled={!puedeSeguir} style={{ ...(puedeSeguir ? grad : { background: C.panel2 }), marginTop: 34, border: "none", color: puedeSeguir ? "#0A0B0D" : C.dim, fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: 18, borderRadius: 999, width: "100%", opacity: puedeSeguir ? 1 : 0.6, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < ultimo ? "CONTINUAR →" : "GENERAR MI PLAN ⚡"}</button>
+      <button className="btn-cta" onClick={next} disabled={!puedeSeguir} style={{ ...btnPrimario, ...(puedeSeguir ? {} : { backgroundImage: "none", background: C.panel2, color: C.dim }), marginTop: 34, width: "100%", padding: 15, fontSize: 15, opacity: puedeSeguir ? 1 : 0.6, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < ultimo ? "Continuar" : "Generar mi plan"}</button>
     </div>
   );
 }
@@ -411,7 +475,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     const space = (h = 8) => { y += h; };
     const rule = () => { ensure(16); doc.setDrawColor(224); doc.line(margin, y, pageW - margin, y); y += 16; };
 
-    line("PULSO", { size: 24, style: "bold", color: [255, 77, 46], gap: 3 });
+    line("PULSO", { size: 24, style: "bold", color: [245, 80, 26], gap: 3 });
     line("Tu plan de alimentación personalizado", { size: 15, style: "bold" });
     space(4);
     line(`Objetivo: ${obj?.titulo}   |   Dieta: ${tipoDieta?.titulo}   |   ${datos.comidasDia} comidas/día`, { size: 10, color: [110, 110, 110], gap: 3 });
@@ -425,7 +489,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     space(6);
     rule();
 
-    line("DIETA SEMANAL", { size: 15, style: "bold", color: [255, 77, 46] });
+    line("DIETA SEMANAL", { size: 15, style: "bold", color: [245, 80, 26] });
     space(4);
     dieta.forEach((d) => {
       ensure(50);
@@ -470,7 +534,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     const thumbs: Record<string, string | null> = {};
     await Promise.all(recetario.map(async (r) => { thumbs[r.id] = await cargarThumb(U(FOODIMG[r.img] || FOODIMG.otro, 200)); }));
 
-    line("RECETARIO", { size: 15, style: "bold", color: [255, 77, 46] });
+    line("RECETARIO", { size: 15, style: "bold", color: [245, 80, 26] });
     space(4);
     recetario.forEach((r) => {
       ensure(TH + 10);
@@ -502,19 +566,16 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     <div>
       <div style={{ position: "relative", height: 340, overflow: "hidden" }}>
         <img src={obj?.img} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
-        <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
-          <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-            {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700 }}>✓ Guardado</span>}
-            <button onClick={descargarPDF} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "8px 18px", fontSize: 13, boxShadow: "0 6px 22px rgba(255,77,46,.35)" }}>⬇ Descargar PDF</button>
-            <NavSecciones onIrSeccion={onIrSeccion} />
-            <button onClick={onReset} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>↺ Empezar de nuevo</button>
-            <CuentaChip onLogin={onLogin} oscuro />
-          </div>
-        </header>
-        <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
-          <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>Tu plan · {obj?.titulo}{datos.tipoDieta !== "omnivora" ? ` · ${tipoDieta?.titulo}` : ""}</div>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.45) 0%, rgba(255,255,255,.75) 62%, #FFFFFF 100%)" }} />
+        <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onReset} acciones={
+          <>
+            {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700, padding: "0 8px" }}>✓ Guardado</span>}
+            <button className="nav-item nav-escritorio" onClick={onReset}>Empezar de nuevo</button>
+            <button className="btn-cta" onClick={descargarPDF} style={{ ...btnPrimario, minWidth: 0, padding: "9px 20px", fontSize: 13 }}>Descargar PDF</button>
+          </>
+        } />
+        <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px", color: C.text }}>
+          <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot1, fontWeight: 700 }}>Tu plan · {obj?.titulo}{datos.tipoDieta !== "omnivora" ? ` · ${tipoDieta?.titulo}` : ""}</div>
           <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{datos.comidasDia} comidas/día · <span style={gradText}>{m.kcal} kcal</span></h1>
         </div>
       </div>
@@ -531,10 +592,10 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
         <div className="fadeUp" style={{ marginTop: 26 }}>
           <div style={{ position: "relative", height: 150, borderRadius: 20, overflow: "hidden", marginBottom: 14 }}>
             <img src={BANNER_DIETA} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(10,11,13,.85), rgba(10,11,13,.3))", display: "flex", alignItems: "center", padding: "0 26px" }}>
-              <div>
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(10,11,13,.72), rgba(10,11,13,.2))", display: "flex", alignItems: "center", padding: "0 26px" }}>
+              <div style={{ color: "#fff" }}>
                 <div style={{ ...DF, fontSize: 24, fontWeight: 800 }}>Tu semana de comidas</div>
-                <div style={{ color: C.dim, fontSize: 13, marginTop: 4 }}>~{m.kcal} kcal · {m.prot} g proteína al día</div>
+                <div style={{ color: "rgba(255,255,255,.78)", fontSize: 13, marginTop: 4 }}>~{m.kcal} kcal · {m.prot} g proteína al día</div>
               </div>
             </div>
           </div>
@@ -601,7 +662,7 @@ function DetalleReceta({ ingredientes, pasos, youtube }) {
       <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Ingredientes</div>
       <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
         {ingredientes.map((ing) => (
-          <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#D6D9DE" }}>
+          <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#3F454C" }}>
             <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 13, flexShrink: 0, minWidth: 74 }}>{ing.cantidad}</span>{ing.nombre}
           </li>
         ))}
@@ -609,12 +670,12 @@ function DetalleReceta({ ingredientes, pasos, youtube }) {
       <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "18px 0 10px" }}>Modo de elaboración</div>
       <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
         {pasos.map((p, pi) => (
-          <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#D6D9DE" }}>
+          <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#3F454C" }}>
             <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
           </li>
         ))}
       </ol>
-      <a href={youtube} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.05)", border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 14, color: C.text }}>
+      <a href={youtube} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(29,29,31,.06)", borderRadius: 980, padding: "11px 20px", fontWeight: 600, fontSize: 14, color: C.text }}>
         <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
         Ver vídeo de la receta en YouTube
       </a>
@@ -627,17 +688,12 @@ function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion,
   return (
     <div style={{ position: "relative", height: 300, overflow: "hidden" }}>
       <img src={banner} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
-      <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
-        <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-          <button onClick={onBack} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>← Volver</button>
-          <NavSecciones onIrSeccion={onIrSeccion} actual={actual} />
-          <CuentaChip onLogin={onLogin} oscuro />
-        </div>
-      </header>
-      <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
-        <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>{kicker}</div>
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.45) 0%, rgba(255,255,255,.75) 62%, #FFFFFF 100%)" }} />
+      <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} actual={actual} acciones={
+        <button className="nav-item" onClick={onBack}>← Volver</button>
+      } />
+      <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px", color: C.text }}>
+        <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot1, fontWeight: 700 }}>{kicker}</div>
         <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{titulo}</h1>
       </div>
     </div>
@@ -766,7 +822,7 @@ function Recetario({ onBack, onLogin, onIrSeccion }) {
             <div style={{ fontSize: 28 }}>🍽️</div>
             <div style={{ ...DF, fontWeight: 800, fontSize: 18, marginTop: 8 }}>No hay recetas con esa búsqueda</div>
             <p style={{ color: C.dim, fontSize: 14, margin: "6px 0 16px" }}>Prueba con otro nombre o ingrediente, o quita los filtros.</p>
-            <button onClick={() => { setBusqueda(""); setCat("todas"); }} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "10px 22px", fontSize: 14 }}>Ver todas las recetas</button>
+            <button className="btn-cta" onClick={() => { setBusqueda(""); setCat("todas"); }} style={{ ...btnPrimario, minWidth: 0, padding: "10px 24px" }}>Ver todas las recetas</button>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 14 }}>
