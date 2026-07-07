@@ -32,6 +32,10 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Tests
+        # Lógica pura e invariantes del catálogo de recetas: si fallan, no se despliega.
+        run: npm test
+
       - name: Compilar
         run: npm run build
         env:
