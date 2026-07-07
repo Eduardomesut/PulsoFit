@@ -26,6 +26,13 @@ const DF = { fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", lette
 const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#FF4D2E'/><stop offset='1' stop-color='#FF9A3C'/></linearGradient></defs><rect width='400' height='400' fill='#1A1D22'/><circle cx='200' cy='210' r='78' fill='url(#g)' opacity='0.28'/><circle cx='200' cy='210' r='40' fill='url(#g)' opacity='0.5'/></svg>`)}`;
 const onImgError = (e) => { const t = e.currentTarget; if (t.src !== FALLBACK_IMG) t.src = FALLBACK_IMG; };
 
+/* Botones de acción principales, estética minimalista tipo Tesla:
+   rectángulo apenas redondeado, tamaño uniforme y sin adornos.
+   El primario lleva el degradado de marca; el secundario es translúcido con blur. */
+const btnBase = { border: "none", borderRadius: 8, fontWeight: 600, fontSize: 14, letterSpacing: "0.01em", padding: "13px 24px", minWidth: "min(264px, 100%)", transition: "transform .15s ease, filter .15s ease" };
+const btnPrimario = { ...btnBase, ...grad, color: "#0A0B0D", fontWeight: 700 };
+const btnSecundario = { ...btnBase, background: "rgba(255,255,255,.14)", color: C.text, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" };
+
 const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
 const BANNER_CINE = U("1489599849927-2ee91cede3ba"); // butacas de cine; si falla, onImgError pone el degradado de marca
@@ -80,6 +87,16 @@ export default function App() {
         ::selection { background:${C.hot1}; color:#fff; }
         @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; } }
         .exwrap:hover .eximg { transform: scale(1.06); }
+        /* Navegación tipo Tesla: enlaces de texto planos que muestran una
+           pastilla translúcida al pasar el ratón. */
+        .nav-item { background: transparent; border: none; color: ${C.text}; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 8px; transition: background .2s ease; text-decoration: none; white-space: nowrap; }
+        .nav-item:hover { background: rgba(255,255,255,.12); backdrop-filter: blur(8px); }
+        .nav-item.activo { background: rgba(255,255,255,.12); backdrop-filter: blur(8px); }
+        @media (max-width: 900px) { .nav-escritorio { display: none !important; } }
+        @media (min-width: 901px) { .nav-movil { display: none !important; } }
+        @keyframes menuIn { from { transform: translateX(100%); } to { transform: none; } }
+        .btn-cta:hover { filter: brightness(1.08); transform: scale(1.02); }
+        @media (max-width: 600px) { .cta-fila { flex-direction: column; align-items: stretch; } }
       `}</style>
       {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} onIrSeccion={irSeccion} />}
       {fase === "form" && <Formulario datos={datos} set={set} paso={paso} setPaso={setPaso} onFinish={() => setFase("scan")} onBack={() => setFase("hero")} />}
@@ -131,7 +148,7 @@ function AuthModal({ onClose }) {
           <input style={input} type="password" placeholder="Contraseña (mín. 6 caracteres)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={modo === "login" ? "current-password" : "new-password"} />
           {error && <div style={{ color: C.hot1, fontSize: 13, marginTop: 12 }}>{error}</div>}
           {aviso && <div style={{ color: C.hot2, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>{aviso}</div>}
-          <button type="submit" disabled={cargando} style={{ ...grad, width: "100%", marginTop: 18, border: "none", color: "#0A0B0D", fontWeight: 800, fontSize: 15, padding: 15, borderRadius: 999, opacity: cargando ? 0.6 : 1 }}>
+          <button className="btn-cta" type="submit" disabled={cargando} style={{ ...btnPrimario, width: "100%", marginTop: 18, fontSize: 15, padding: 14, opacity: cargando ? 0.6 : 1 }}>
             {cargando ? "Un momento…" : modo === "login" ? "Entrar" : "Registrarme"}
           </button>
         </form>
@@ -155,33 +172,69 @@ function traducirError(msg) {
   return "No se ha podido completar. Inténtalo de nuevo.";
 }
 
-// Chip de sesión reutilizable en las cabeceras (login / usuario).
-function CuentaChip({ onLogin, oscuro }) {
+// Sesión como enlaces de texto planos, al estilo del resto de la navegación.
+// `vertical` la adapta a la lista del menú lateral.
+function CuentaChip({ onLogin, vertical = false }) {
   const { enabled, ready, user, signOut } = useAuth();
   if (!enabled || !ready) return null;
-  const base = { borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700 };
-  if (!user) return (
-    <button onClick={onLogin} style={{ ...base, ...grad, border: "none", color: "#0A0B0D" }}>Iniciar sesión</button>
-  );
+  const item = vertical ? { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" } : {};
+  if (!user) return <button className="nav-item" onClick={onLogin} style={item}>Cuenta</button>;
   const nombre = (user.email || "").split("@")[0];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ fontSize: 13, color: oscuro ? C.text : C.text, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>👤 {nombre}</span>
-      <button onClick={() => signOut()} style={{ ...base, background: oscuro ? "rgba(0,0,0,.4)" : C.panel, border: `1px solid ${C.line}`, color: C.text }}>Salir</button>
-    </div>
+    <>
+      <span className="nav-item" style={{ ...item, color: C.dim, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>{nombre}</span>
+      <button className="nav-item" onClick={() => signOut()} style={item}>Salir</button>
+    </>
   );
 }
 
-// Botones de navegación a las secciones de catálogo, reutilizados en todas las
-// cabeceras. `actual` oculta la sección en la que ya estás.
-function NavSecciones({ onIrSeccion, actual = null }) {
-  const items = [["recetario", "📖 Recetario"], ["cine", "🎬 Cine y series"]];
+// Cabecera compartida por todas las pantallas, estilo Tesla: logo a la izquierda,
+// enlaces de texto centrados (escritorio), acciones contextuales a la derecha y
+// un botón "Menú" que abre el panel lateral en pantallas estrechas.
+// `onInicio` hace clicable el logo; `actual` resalta la sección activa.
+const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"]];
+function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const logo = <span style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></span>;
   return (
-    <>
-      {items.filter(([id]) => id !== actual).map(([id, t]) => (
-        <button key={id} onClick={() => onIrSeccion(id)} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, backdropFilter: "blur(6px)" }}>{t}</button>
-      ))}
-    </>
+    <header style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", gap: 8, padding: "14px 20px" }}>
+      {onInicio
+        ? <button className="nav-item" onClick={onInicio} aria-label="Ir al inicio" style={{ padding: "6px 10px" }}>{logo}</button>
+        : <div style={{ padding: "6px 10px" }}>{logo}</div>}
+      <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
+        {NAV_LINKS.map(([id, t]) => (
+          <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={() => onIrSeccion(id)}>{t}</button>
+        ))}
+      </nav>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+        {acciones}
+        <span className="nav-escritorio" style={{ display: "flex", alignItems: "center", gap: 4 }}><CuentaChip onLogin={onLogin} /></span>
+        <button className="nav-item nav-movil" onClick={() => setMenuAbierto(true)}>Menú</button>
+      </div>
+      {menuAbierto && (
+        <MenuLateral onCerrar={() => setMenuAbierto(false)} onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onInicio} actual={actual} />
+      )}
+    </header>
+  );
+}
+
+// Panel lateral deslizante (menú móvil), estilo Tesla: lista vertical de
+// enlaces planos sobre un panel con blur que entra desde la derecha.
+function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
+  const ir = (fn) => () => { onCerrar(); fn(); };
+  const item = { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" };
+  return (
+    <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 90 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(19,21,25,.92)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderLeft: `1px solid ${C.line}`, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4, animation: "menuIn .28s ease both" }}>
+        <button className="nav-item" onClick={onCerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
+        {onInicio && <button className="nav-item" onClick={ir(onInicio)} style={item}>Inicio</button>}
+        {NAV_LINKS.map(([id, t]) => (
+          <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={item}>{t}</button>
+        ))}
+        <div style={{ height: 1, background: C.line, margin: "10px 4px" }} />
+        <CuentaChip onLogin={ir(onLogin)} vertical />
+      </div>
+    </div>
   );
 }
 
@@ -193,32 +246,25 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar, onIrSeccion }) {
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(10,11,13,.55) 0%, rgba(10,11,13,.35) 40%, rgba(10,11,13,.92) 100%)` }} />
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(900px 480px at 78% 12%, rgba(255,77,46,.28), transparent 62%)` }} />
       </div>
-      <header style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 28px", gap: 12 }}>
-        <div style={{ ...DF, fontWeight: 800, fontSize: 24, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-          <NavSecciones onIrSeccion={onIrSeccion} />
-          <CuentaChip onLogin={onLogin} oscuro />
+      <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} />
+      <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "90px 24px 0" }}>
+        <div style={{ fontSize: 12, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 18, fontWeight: 700 }}>Tu plan. Tu mesa. Tus reglas.</div>
+        <h1 style={{ ...DF, fontSize: "clamp(42px, 8vw, 96px)", fontWeight: 800, lineHeight: 1, margin: 0 }}>Come con <span style={gradText}>intención.</span></h1>
+        <p style={{ color: "#D7DADF", fontSize: 17, maxWidth: 560, lineHeight: 1.6, marginTop: 22 }}>Dinos tu objetivo, tus gustos y tus alergias. En segundos generamos tu semana de comidas completa, con cada receta ilustrada paso a paso.</p>
+      </main>
+      <div className="fadeUp" style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 30, padding: "40px 24px 6vh" }}>
+        <div className="cta-fila" style={{ display: "flex", gap: 14, justifyContent: "center", width: "100%", maxWidth: 600 }}>
+          <button className="btn-cta" onClick={onStart} style={btnPrimario}>Crear mi plan</button>
+          {planGuardado
+            ? <button className="btn-cta" onClick={onRetomar} style={btnSecundario}>Continuar con mi plan</button>
+            : <button className="btn-cta" onClick={() => onIrSeccion("recetario")} style={btnSecundario}>Explorar el recetario</button>}
         </div>
-      </header>
-      <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 28px 9vh", maxWidth: 1100 }}>
-        <div style={{ fontSize: 13, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 20, fontWeight: 700 }}>Tu plan. Tu mesa. Tus reglas.</div>
-        <h1 style={{ ...DF, fontSize: "clamp(46px, 9vw, 118px)", fontWeight: 800, lineHeight: 0.95, margin: 0 }}>Come con<br /><span style={gradText}>intención.</span></h1>
-        <p style={{ color: "#D7DADF", fontSize: 18, maxWidth: 540, lineHeight: 1.6, marginTop: 26 }}>Dinos tu objetivo, tus gustos y tus alergias. En segundos generamos tu semana de comidas completa, con cada receta ilustrada, sus ingredientes y su modo de elaboración paso a paso.</p>
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-          <button onClick={onStart} style={{ ...grad, marginTop: 34, border: "none", color: "#0A0B0D", fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: "19px 56px", borderRadius: 999, boxShadow: "0 10px 44px rgba(255,77,46,.4)", transition: "transform .15s" }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>CREAR MI PLAN GRATIS →</button>
-          {planGuardado && (
-            <button onClick={onRetomar} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>↩ Continuar con mi plan guardado</button>
-          )}
-          <button onClick={() => onIrSeccion("recetario")} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>📖 Explorar el recetario</button>
-          <button onClick={() => onIrSeccion("cine")} style={{ marginTop: 34, background: "rgba(255,255,255,.06)", border: `1.5px solid ${C.line}`, color: C.text, fontWeight: 700, fontSize: 15, padding: "18px 30px", borderRadius: 999, backdropFilter: "blur(6px)" }}>🎬 Recetas de cine y series</button>
-        </div>
-        <div style={{ display: "flex", gap: 48, marginTop: 60, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 36, flexWrap: "wrap", justifyContent: "center" }}>
           {[["4", "objetivos"], ["7 días", "de dieta"], [`${RECETAS.length}`, "recetas con foto"]].map(([n, t]) => (
-            <div key={t}><div style={{ ...DF, fontSize: 32, fontWeight: 800 }}>{n}</div><div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3 }}>{t}</div></div>
+            <div key={t} style={{ textAlign: "center" }}><div style={{ ...DF, fontSize: 20, fontWeight: 800 }}>{n}</div><div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>{t}</div></div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -339,7 +385,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
           </>
         )}
       </div>
-      <button onClick={next} disabled={!puedeSeguir} style={{ ...(puedeSeguir ? grad : { background: C.panel2 }), marginTop: 34, border: "none", color: puedeSeguir ? "#0A0B0D" : C.dim, fontWeight: 800, fontSize: 16, letterSpacing: "0.06em", padding: 18, borderRadius: 999, width: "100%", opacity: puedeSeguir ? 1 : 0.6, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < ultimo ? "CONTINUAR →" : "GENERAR MI PLAN ⚡"}</button>
+      <button className="btn-cta" onClick={next} disabled={!puedeSeguir} style={{ ...btnPrimario, ...(puedeSeguir ? {} : { backgroundImage: "none", background: C.panel2, color: C.dim }), marginTop: 34, width: "100%", padding: 15, fontSize: 15, opacity: puedeSeguir ? 1 : 0.6, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < ultimo ? "Continuar" : "Generar mi plan"}</button>
     </div>
   );
 }
@@ -503,16 +549,13 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
       <div style={{ position: "relative", height: 340, overflow: "hidden" }}>
         <img src={obj?.img} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
-        <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
-          <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-            {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700 }}>✓ Guardado</span>}
-            <button onClick={descargarPDF} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "8px 18px", fontSize: 13, boxShadow: "0 6px 22px rgba(255,77,46,.35)" }}>⬇ Descargar PDF</button>
-            <NavSecciones onIrSeccion={onIrSeccion} />
-            <button onClick={onReset} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>↺ Empezar de nuevo</button>
-            <CuentaChip onLogin={onLogin} oscuro />
-          </div>
-        </header>
+        <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onReset} acciones={
+          <>
+            {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700, padding: "0 8px" }}>✓ Guardado</span>}
+            <button className="nav-item nav-escritorio" onClick={onReset}>Empezar de nuevo</button>
+            <button className="btn-cta" onClick={descargarPDF} style={{ ...btnPrimario, minWidth: 0, padding: "9px 20px", fontSize: 13 }}>Descargar PDF</button>
+          </>
+        } />
         <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
           <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>Tu plan · {obj?.titulo}{datos.tipoDieta !== "omnivora" ? ` · ${tipoDieta?.titulo}` : ""}</div>
           <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{datos.comidasDia} comidas/día · <span style={gradText}>{m.kcal} kcal</span></h1>
@@ -614,7 +657,7 @@ function DetalleReceta({ ingredientes, pasos, youtube }) {
           </li>
         ))}
       </ol>
-      <a href={youtube} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.05)", border: `1.5px solid ${C.line}`, borderRadius: 999, padding: "11px 20px", fontWeight: 700, fontSize: 14, color: C.text }}>
+      <a href={youtube} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(255,255,255,.07)", borderRadius: 8, padding: "11px 20px", fontWeight: 600, fontSize: 14, color: C.text }}>
         <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
         Ver vídeo de la receta en YouTube
       </a>
@@ -628,14 +671,9 @@ function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion,
     <div style={{ position: "relative", height: 300, overflow: "hidden" }}>
       <img src={banner} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.5), rgba(10,11,13,.95))" }} />
-      <header style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px" }}>
-        <div style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
-          <button onClick={onBack} style={{ background: "rgba(0,0,0,.4)", border: `1px solid ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 13, backdropFilter: "blur(6px)" }}>← Volver</button>
-          <NavSecciones onIrSeccion={onIrSeccion} actual={actual} />
-          <CuentaChip onLogin={onLogin} oscuro />
-        </div>
-      </header>
+      <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} actual={actual} acciones={
+        <button className="nav-item" onClick={onBack}>← Volver</button>
+      } />
       <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px" }}>
         <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot2, fontWeight: 700 }}>{kicker}</div>
         <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{titulo}</h1>
@@ -766,7 +804,7 @@ function Recetario({ onBack, onLogin, onIrSeccion }) {
             <div style={{ fontSize: 28 }}>🍽️</div>
             <div style={{ ...DF, fontWeight: 800, fontSize: 18, marginTop: 8 }}>No hay recetas con esa búsqueda</div>
             <p style={{ color: C.dim, fontSize: 14, margin: "6px 0 16px" }}>Prueba con otro nombre o ingrediente, o quita los filtros.</p>
-            <button onClick={() => { setBusqueda(""); setCat("todas"); }} style={{ ...grad, border: "none", color: "#0A0B0D", fontWeight: 800, borderRadius: 999, padding: "10px 22px", fontSize: 14 }}>Ver todas las recetas</button>
+            <button className="btn-cta" onClick={() => { setBusqueda(""); setCat("todas"); }} style={{ ...btnPrimario, minWidth: 0, padding: "10px 24px" }}>Ver todas las recetas</button>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 14 }}>
