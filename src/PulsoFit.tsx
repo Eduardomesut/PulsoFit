@@ -41,6 +41,7 @@ const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
 const BANNER_CINE = U("1489599849927-2ee91cede3ba"); // butacas de cine; si falla, onImgError pone el degradado de marca
 const BANNER_RECETARIO = U("1466637574441-749b8f19452f"); // mesa con ingredientes, cabecera del recetario
+const BANNER_RESTAURANTES = U("1517248135467-4c7edcad34c4"); // interior de restaurante, cabecera de la sección de restaurantes
 
 export default function App() {
   const [fase, setFase] = useState("hero");
@@ -75,7 +76,7 @@ export default function App() {
   // Secciones de catálogo (recetario y cine): recuerdan desde qué pantalla se
   // abrieron para volver a ella; saltar de una sección a otra no pisa ese origen.
   const [seccionDesde, setSeccionDesde] = useState("hero");
-  const esSeccion = (f) => f === "cine" || f === "recetario";
+  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes";
   const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
 
   return (
@@ -120,6 +121,7 @@ export default function App() {
       {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "cine" && <Cine onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "recetario" && <Recetario onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "restaurantes" && <Restaurantes datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
   );
@@ -208,7 +210,7 @@ function CuentaChip({ onLogin, vertical = false }) {
 // enlaces de texto centrados (escritorio), acciones contextuales a la derecha y
 // un botón "Menú" que abre el panel lateral en pantallas estrechas.
 // `onInicio` hace clicable el logo; `actual` resalta la sección activa.
-const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"]];
+const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"], ["restaurantes", "Restaurantes"]];
 function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const logo = <span style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></span>;
@@ -831,6 +833,70 @@ function Recetario({ onBack, onLogin, onIrSeccion }) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Sección "Restaurantes": busca sitios para comer fuera acordes al plan.
+// Usa el embed público de Google Maps (output=embed, sin clave de API): el
+// mapa muestra los restaurantes de la zona con sus fichas y reseñas. Los
+// chips afinan la búsqueda y se preseleccionan según la dieta del usuario.
+const TIPOS_RESTAURANTE = [
+  ["saludables", "Saludable"], ["veganos", "Vegano"], ["vegetarianos", "Vegetariano"],
+  ["sin gluten", "Sin gluten"], ["de poke y bowls", "Poke y bowls"], ["de ensaladas", "Ensaladas"],
+];
+
+function Restaurantes({ datos, onBack, onLogin, onIrSeccion }) {
+  const porDieta = { vegana: "veganos", vegetariana: "vegetarianos", sinGluten: "sin gluten", sinLactosa: "saludables" };
+  const [lugar, setLugar] = useState("");
+  const [tipo, setTipo] = useState(porDieta[datos?.tipoDieta] ?? "saludables");
+  const [busqueda, setBusqueda] = useState<{ lugar: string; tipo: string } | null>(null);
+  const buscar = (e) => { e.preventDefault(); if (lugar.trim()) setBusqueda({ lugar: lugar.trim(), tipo }); };
+  const elegirTipo = (t) => { setTipo(t); if (busqueda) setBusqueda({ ...busqueda, tipo: t }); };
+  const consulta = busqueda ? `restaurantes ${busqueda.tipo} en ${busqueda.lugar}` : "";
+  return (
+    <div>
+      <CabeceraSeccion banner={BANNER_RESTAURANTES} kicker="Para comer fuera sin salirte del plan" titulo={<>Restaurantes <span style={gradText}>cerca de ti</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="restaurantes" />
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 80px" }}>
+        <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Escribe tu ciudad o tu barrio y te enseñamos en el mapa restaurantes que encajan con tu forma de comer, con sus reseñas y su ubicación.</p>
+        <form className="fadeUp" onSubmit={buscar} style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flex: "1 1 260px" }}>
+            <span style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", fontSize: 16, pointerEvents: "none" }}>📍</span>
+            <input value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="Ciudad o zona: Madrid, Malasaña, Valencia…" aria-label="Ciudad o zona" style={{ width: "100%", boxSizing: "border-box", padding: "16px 20px 16px 50px", borderRadius: 999, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
+          </div>
+          <button className="btn-cta" type="submit" disabled={!lugar.trim()} style={{ ...btnPrimario, minWidth: 0, padding: "13px 32px", opacity: lugar.trim() ? 1 : 0.55 }}>Buscar</button>
+        </form>
+        <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+          {TIPOS_RESTAURANTE.map(([id, t]) => (
+            <button key={id} onClick={() => elegirTipo(id)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${tipo === id ? C.hot1 : C.line}`, color: tipo === id ? "#fff" : C.dim, ...(tipo === id ? grad : { background: C.panel }) }}>{t}</button>
+          ))}
+        </div>
+        {busqueda ? (
+          <div className="fadeUp">
+            <div style={{ borderRadius: 18, overflow: "hidden", border: `1px solid ${C.line}` }}>
+              <iframe
+                title={`Mapa de ${consulta}`}
+                src={`https://www.google.com/maps?q=${encodeURIComponent(consulta)}&hl=es&output=embed`}
+                style={{ width: "100%", height: 480, border: 0, display: "block" }}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
+              <a className="btn-cta" href={`https://www.google.com/maps/search/${encodeURIComponent(consulta)}`} target="_blank" rel="noopener noreferrer" style={{ ...btnSecundario, minWidth: 0, padding: "11px 24px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8 }}>Abrir en Google Maps ↗</a>
+              <span style={{ color: C.dim, fontSize: 13 }}>Resultados de Google Maps para «{consulta}»</span>
+            </div>
+          </div>
+        ) : (
+          <div className="fadeUp" style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 18, padding: "44px 22px", textAlign: "center" }}>
+            <div style={{ fontSize: 30 }}>🗺️</div>
+            <div style={{ ...DF, fontWeight: 800, fontSize: 18, marginTop: 8 }}>¿Dónde quieres comer?</div>
+            <p style={{ color: C.dim, fontSize: 14, margin: "6px 0 0", lineHeight: 1.6 }}>Introduce una ciudad o un barrio y elige el tipo de cocina:<br />te mostraremos el mapa con los restaurantes de la zona.</p>
+          </div>
+        )}
+        <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>ℹ️ Los resultados y reseñas son de Google Maps. Si tienes alergias, confirma siempre las opciones directamente con el restaurante.</div>
       </div>
     </div>
   );
