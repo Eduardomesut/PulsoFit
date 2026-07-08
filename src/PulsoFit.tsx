@@ -1,6 +1,28 @@
-import React, { useState, useEffect, useMemo, useRef, createContext, useContext } from "react";
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, createContext, useContext } from "react";
+import Lenis from "lenis";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useAuth } from "./auth";
 import { supabase } from "./supabase";
+
+gsap.registerPlugin(ScrollTrigger);
+// ¿El usuario pide menos movimiento? Entonces ni scroll suave ni animaciones.
+const REDUCE = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* Arranca el scroll con inercia (Lenis) y lo sincroniza con GSAP ScrollTrigger:
+   el ticker de GSAP alimenta el rAF de Lenis y cada scroll refresca los
+   triggers. Se salta por completo si el usuario prefiere menos movimiento. */
+function useScrollSuave() {
+  useEffect(() => {
+    if (REDUCE) return;
+    const lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+    lenis.on("scroll", ScrollTrigger.update);
+    const ticker = (t) => lenis.raf(t * 1000);
+    gsap.ticker.add(ticker);
+    gsap.ticker.lagSmoothing(0);
+    return () => { gsap.ticker.remove(ticker); lenis.destroy(); };
+  }, []);
+}
 import {
   U, youtubeUrl, normalizar, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS,
   RECETAS, RECETAS_CINE, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
@@ -62,6 +84,7 @@ export default function App() {
   const [authAbierto, setAuthAbierto] = useState(false);
   const [planGuardado, setPlanGuardado] = useState(null);
   const set = (k, v) => setDatos((d) => ({ ...d, [k]: v }));
+  useScrollSuave();
   const { user } = useAuth();
   // Fase actual accesible dentro de callbacks asíncronos sin cerrar sobre un valor obsoleto.
   const faseRef = useRef(fase);
@@ -105,7 +128,6 @@ export default function App() {
     <RutinaCtx.Provider value={irARutina}>
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: MONO, fontSize: 14 }}>
       <style>{`
-        html { scroll-behavior: smooth; }
         @keyframes fadeUp { from { opacity:0; transform:translateY(26px);} to {opacity:1; transform:none;} }
         @keyframes kenburns { from { transform: scale(1);} to { transform: scale(1.12);} }
         @keyframes scanline { 0%{top:0%;} 100%{top:100%;} }
@@ -115,7 +137,9 @@ export default function App() {
            ratón (variables --px/--py) y la interior levita en bucle. Al pasar
            el ratón por encima, la foto se endereza y crece un poco. */
         @keyframes flotar { 0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); } 50% { transform: translateY(-13px) rotate(calc(var(--rot, 0deg) + 1.6deg)); } }
-        .polaroid { position: absolute; transform: translate(var(--px, 0px), var(--py, 0px)); transition: transform .45s cubic-bezier(.2,.8,.3,1); will-change: transform; z-index: 3; }
+        /* La posición (x/y) la controla GSAP (quickTo) sobre esta capa; el
+           bucle de levitación vive en .polaroid-marco, un elemento distinto. */
+        .polaroid { position: absolute; will-change: transform; z-index: 3; }
         .polaroid:hover { z-index: 6; }
         .polaroid-marco { animation: flotar var(--dur, 7s) ease-in-out infinite; background: #fff; border: 2px solid ${C.line}; border-radius: 10px; padding: 9px 9px 12px; box-shadow: 5px 6px 0 rgba(15,44,86,.85); transition: transform .3s cubic-bezier(.2,.8,.3,1.4); }
         .polaroid:hover .polaroid-marco { animation-play-state: paused; transform: rotate(0deg) scale(1.07); }
@@ -316,29 +340,29 @@ function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
   );
 }
 
-/* Aparece: revela su contenido cuando entra en el viewport (IntersectionObserver),
-   con un pequeño salto y giro tipo pegatina. Sustituye al fadeUp de montaje en
-   las listas largas, para que cada tarjeta anime justo cuando se ve. */
+/* Aparece: revela su contenido con GSAP ScrollTrigger cuando entra en el
+   viewport, con un salto y giro tipo pegatina. Sincronizado con el scroll
+   suave de Lenis. Si el usuario pide menos movimiento, se muestra sin más. */
 function Aparece({ children, delay = 0, rot = 0 }: any) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visto, setVisto] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") { setVisto(true); return; }
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisto(true); io.disconnect(); } }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
-    io.observe(el);
-    return () => io.disconnect();
+    if (!el || REDUCE) return;
+    const ctx = gsap.context(() => {
+      gsap.from(el, {
+        opacity: 0, y: 34, rotation: rot, scale: 0.97, duration: 0.6, ease: "back.out(1.5)", delay: delay / 1000,
+        scrollTrigger: { trigger: el, start: "top 88%", toggleActions: "play none none none" },
+      });
+    }, el);
+    return () => ctx.revert();
   }, []);
-  return (
-    <div ref={ref} style={{ opacity: visto ? 1 : 0, transform: visto ? "none" : `translateY(30px) rotate(${rot}deg) scale(.98)`, transition: `opacity .55s ease ${delay}ms, transform .55s cubic-bezier(.2,.9,.3,1.15) ${delay}ms` }}>
-      {children}
-    </div>
-  );
+  return <div ref={ref}>{children}</div>;
 }
 
-/* Fotos flotantes del hero: polaroids giradas que levitan en bucle y se
-   apartan del ratón cuando pasa cerca (paralaje + repulsión), como las
-   fotos sueltas de la web de pizza-amici. Solo escritorio (>1080px). */
+/* Fotos flotantes del hero: polaroids giradas que levitan en bucle (CSS) y se
+   apartan del ratón cuando pasa cerca (paralaje + repulsión de cercanía),
+   como las fotos sueltas de pizza-amici. El seguimiento del ratón lo suaviza
+   gsap.quickTo (interpolación amortiguada). Solo escritorio (>1080px). */
 const POLAROIDS = [
   { img: "ensalada", texto: "sin remordimientos", pos: { top: "23%", left: "5%" }, rot: -7, deriva: 30, dur: 7.2 },
   { img: "batido", texto: "listo en 10 min", pos: { top: "56%", left: "10%" }, rot: 5, deriva: 55, dur: 8.4 },
@@ -347,18 +371,21 @@ const POLAROIDS = [
 ];
 function FotosFlotantes() {
   const capa = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = capa.current;
-    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let raf = 0;
-    const onMove = (e: MouseEvent) => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
+    if (!el || REDUCE) return;
+    const ctx = gsap.context(() => {
+      const fotos = Array.from(el.querySelectorAll<HTMLElement>(".polaroid"));
+      // Una interpolación amortiguada por eje y foto: el destino salta, la
+      // posición real lo persigue con suavidad (sin recolocar en cada frame).
+      const setX = fotos.map((f) => gsap.quickTo(f, "x", { duration: 0.6, ease: "power3.out" }));
+      const setY = fotos.map((f) => gsap.quickTo(f, "y", { duration: 0.6, ease: "power3.out" }));
+      const onMove = (e: MouseEvent) => {
         const r = el.getBoundingClientRect();
-        el.querySelectorAll<HTMLElement>(".polaroid").forEach((foto, i) => {
+        fotos.forEach((foto, i) => {
           const fr = foto.getBoundingClientRect();
           const cx = fr.left + fr.width / 2, cy = fr.top + fr.height / 2;
-          // Deriva de profundidad: cada foto sigue al ratón a su propio ritmo…
+          // Paralaje de profundidad: cada foto sigue al ratón a su propio ritmo…
           const deriva = POLAROIDS[i]?.deriva ?? 40;
           let px = (e.clientX - (r.left + r.width / 2)) / deriva;
           let py = (e.clientY - (r.top + r.height / 2)) / deriva;
@@ -367,13 +394,13 @@ function FotosFlotantes() {
           const dist = Math.hypot(dx, dy);
           const fuerza = Math.max(0, 1 - dist / 300) * 46;
           if (dist > 1) { px += (dx / dist) * fuerza; py += (dy / dist) * fuerza; }
-          foto.style.setProperty("--px", `${px.toFixed(1)}px`);
-          foto.style.setProperty("--py", `${py.toFixed(1)}px`);
+          setX[i](px); setY[i](py);
         });
-      });
-    };
-    window.addEventListener("mousemove", onMove);
-    return () => { window.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
+      };
+      window.addEventListener("mousemove", onMove);
+      return () => window.removeEventListener("mousemove", onMove);
+    }, el);
+    return () => ctx.revert();
   }, []);
   return (
     <div ref={capa} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
