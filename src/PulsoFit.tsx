@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, createContext, useContext } from "react";
 import { useAuth } from "./auth";
 import { supabase } from "./supabase";
 import {
@@ -44,6 +44,12 @@ const BANNER_CINE = U("1489599849927-2ee91cede3ba"); // butacas de cine; si fall
 const BANNER_RECETARIO = U("1466637574441-749b8f19452f"); // mesa con ingredientes, cabecera del recetario
 const BANNER_RESTAURANTES = U("1517248135467-4c7edcad34c4"); // interior de restaurante, cabecera de la sección de restaurantes
 
+/* Enlace "Mi rutina" del menú: App lo rellena cuando hay sesión iniciada y un
+   plan que enseñar (el de la sesión actual o el guardado en Supabase); null lo
+   oculta. Va por contexto para que la cabecera lo lea desde cualquier pantalla
+   sin arrastrar la prop por todas. */
+const RutinaCtx = createContext<null | (() => void)>(null);
+
 export default function App() {
   const [fase, setFase] = useState("hero");
   const [paso, setPaso] = useState(0);
@@ -74,6 +80,16 @@ export default function App() {
 
   const retomarPlan = () => { if (planGuardado) { setDatos(planGuardado); setFase("plan"); } };
 
+  // "Mi rutina": con sesión iniciada y un plan disponible, el menú ofrece
+  // volver a él desde cualquier pantalla. Prefiere el plan de la sesión en
+  // curso; si no lo hay (p. ej. tras recargar en otra sección), el guardado.
+  const irARutina = useMemo(() => {
+    if (!user) return null;
+    if (datos.objetivo && datos.sexo) return () => setFase("plan");
+    if (planGuardado) return () => { setDatos(planGuardado); setFase("plan"); };
+    return null;
+  }, [user, datos.objetivo, datos.sexo, planGuardado]);
+
   // Secciones de catálogo (recetario y cine): recuerdan desde qué pantalla se
   // abrieron para volver a ella; saltar de una sección a otra no pisa ese origen.
   const [seccionDesde, setSeccionDesde] = useState("hero");
@@ -81,6 +97,7 @@ export default function App() {
   const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
 
   return (
+    <RutinaCtx.Provider value={irARutina}>
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <style>{`
         @keyframes fadeUp { from { opacity:0; transform:translateY(26px);} to {opacity:1; transform:none;} }
@@ -126,6 +143,7 @@ export default function App() {
       {fase === "restaurantes" && <Restaurantes datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
+    </RutinaCtx.Provider>
   );
 }
 
@@ -215,6 +233,7 @@ function CuentaChip({ onLogin, vertical = false }) {
 const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"], ["restaurantes", "Restaurantes"]];
 function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const irARutina = useContext(RutinaCtx);
   const logo = <span style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></span>;
   return (
     <header className="sobre-foto" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", gap: 8, padding: "14px 20px", color: "#fff" }}>
@@ -222,6 +241,7 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
         ? <button className="nav-item" onClick={onInicio} aria-label="Ir al inicio" style={{ padding: "6px 10px" }}>{logo}</button>
         : <div style={{ padding: "6px 10px" }}>{logo}</div>}
       <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
+        {irARutina && <button className={`nav-item${actual === "rutina" ? " activo" : ""}`} onClick={irARutina}>Mi rutina</button>}
         {NAV_LINKS.map(([id, t]) => (
           <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={() => onIrSeccion(id)}>{t}</button>
         ))}
@@ -242,12 +262,14 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
 // enlaces planos sobre un panel con blur que entra desde la derecha.
 function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
   const ir = (fn) => () => { onCerrar(); fn(); };
+  const irARutina = useContext(RutinaCtx);
   const item = { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" };
   return (
     <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 90 }}>
       <div className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderLeft: `1px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4, animation: "menuIn .28s ease both" }}>
         <button className="nav-item" onClick={onCerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
         {onInicio && <button className="nav-item" onClick={ir(onInicio)} style={item}>Inicio</button>}
+        {irARutina && <button className={`nav-item${actual === "rutina" ? " activo" : ""}`} onClick={ir(irARutina)} style={item}>Mi rutina</button>}
         {NAV_LINKS.map(([id, t]) => (
           <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={item}>{t}</button>
         ))}
@@ -571,7 +593,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
       <div style={{ position: "relative", height: 340, overflow: "hidden" }}>
         <img src={obj?.img} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.45) 0%, rgba(255,255,255,.75) 62%, #FFFFFF 100%)" }} />
-        <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onReset} acciones={
+        <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onReset} actual="rutina" acciones={
           <>
             {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700, padding: "0 8px" }}>✓ Guardado</span>}
             <button className="nav-item nav-escritorio" onClick={onReset}>Empezar de nuevo</button>
