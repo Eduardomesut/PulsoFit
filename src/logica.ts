@@ -531,3 +531,48 @@ export function migrarDatos(d) {
     comidasDia: [3, 4, 5].includes(d.comidasDia) ? d.comidasDia : 5,
   };
 }
+
+/* ============================================================
+   Recetas de la comunidad: creadas por usuarios con sesión y
+   guardadas en Supabase (tabla recetas_comunidad). Aquí vive la
+   lógica pura; la interfaz y las llamadas a Supabase, en PulsoFit.tsx.
+   ============================================================ */
+
+/* Único correo con permiso para borrar recetas de OTROS usuarios. Aquí solo
+   decide qué botones se muestran: la seguridad real la imponen las políticas
+   RLS de supabase/schema.sql, que repiten este mismo correo. */
+export const ADMIN_EMAIL = "merinofernandezeduardo@gmail.com";
+
+/* Una receta de la comunidad la puede borrar su autor o el administrador.
+   Solo aplica a recetas con user_id (las del catálogo fijo no se borran). */
+export function puedeBorrarReceta(user, receta) {
+  if (!user || !receta || !receta.user_id) return false;
+  return receta.user_id === user.id || user.email === ADMIN_EMAIL;
+}
+
+/* Despensa de la web: todos los ingredientes que usan las recetas del
+   catálogo, sin duplicados y ordenados. Es la lista de la que se eligen
+   los ingredientes al crear una receta de la comunidad. */
+export const INGREDIENTES_WEB = [...new Set(RECETAS.flatMap((r) => r.ingredientes.map((i) => i.nombre)))]
+  .sort((a, b) => a.localeCompare(b, "es"));
+
+export const CATEGORIAS_RECETA = ["desayuno", "comida", "cena", "snack"];
+
+/* Valida el borrador de una receta de la comunidad antes de publicarla.
+   Devuelve la lista de problemas en castellano; vacía si es publicable. */
+export function validarRecetaComunidad(borrador) {
+  const errores: string[] = [];
+  if (!borrador || typeof borrador !== "object") return ["La receta está vacía."];
+  if (!borrador.nombre || borrador.nombre.trim().length < 3) errores.push("Ponle un nombre a la receta (mínimo 3 letras).");
+  if (!CATEGORIAS_RECETA.includes(borrador.categoria)) errores.push("Elige una categoría: desayuno, comida, cena o snack.");
+  if (!(borrador.img in FOODIMG)) errores.push("Elige el tipo de plato para la foto.");
+  const kcal = Number(borrador.kcalAprox);
+  if (!Number.isFinite(kcal) || kcal < 50 || kcal > 2000) errores.push("Indica las kcal aproximadas por ración (entre 50 y 2000).");
+  const ingredientes = Array.isArray(borrador.ingredientes) ? borrador.ingredientes : [];
+  if (ingredientes.length < 2) errores.push("Añade al menos 2 ingredientes de la despensa.");
+  if (ingredientes.some((i) => !INGREDIENTES_WEB.includes(i.nombre))) errores.push("Solo puedes usar ingredientes disponibles en la despensa de la web.");
+  if (ingredientes.some((i) => !i.cantidad || !i.cantidad.trim())) errores.push("Indica la cantidad de cada ingrediente.");
+  const pasos = (Array.isArray(borrador.pasos) ? borrador.pasos : []).filter((p) => p && p.trim());
+  if (pasos.length < 2) errores.push("Describe la elaboración en al menos 2 pasos.");
+  return errores;
+}
