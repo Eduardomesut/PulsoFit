@@ -1,6 +1,28 @@
-import React, { useState, useEffect, useMemo, useRef, createContext, useContext } from "react";
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, createContext, useContext } from "react";
+import Lenis from "lenis";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useAuth } from "./auth";
 import { supabase } from "./supabase";
+
+gsap.registerPlugin(ScrollTrigger);
+// ¿El usuario pide menos movimiento? Entonces ni scroll suave ni animaciones.
+const REDUCE = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* Arranca el scroll con inercia (Lenis) y lo sincroniza con GSAP ScrollTrigger:
+   el ticker de GSAP alimenta el rAF de Lenis y cada scroll refresca los
+   triggers. Se salta por completo si el usuario prefiere menos movimiento. */
+function useScrollSuave() {
+  useEffect(() => {
+    if (REDUCE) return;
+    const lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+    lenis.on("scroll", ScrollTrigger.update);
+    const ticker = (t) => lenis.raf(t * 1000);
+    gsap.ticker.add(ticker);
+    gsap.ticker.lagSmoothing(0);
+    return () => { gsap.ticker.remove(ticker); lenis.destroy(); };
+  }, []);
+}
 import {
   U, youtubeUrl, normalizar, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS,
   RECETAS, RECETAS_CINE, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
@@ -15,28 +37,33 @@ import {
    Imágenes: Unsplash (fuente libre) vía URL directa.
    ============================================================ */
 
-/* Paleta clara estilo Apple: los grises de apple.com (#F5F5F7 para paneles,
-   texto #1D1D1F, secundario #6E6E73) y el acento de marca en dos naranjas
-   próximos en tono para que el degradado sea suave, no estridente. */
+/* Paleta retro de food-truck (inspirada en pizza-amici.nl): crema de fondo,
+   azul marino como tinta principal (texto Y bordes, siempre visibles),
+   mostaza para las acciones, celeste para paneles destacados y rojo tomate
+   como acento. Sombras duras desplazadas, nada de difuminados. */
 const C = {
-  bg: "#FFFFFF", panel: "#F5F5F7", panel2: "#E8E8ED",
-  line: "#E2E2E7", text: "#1D1D1F", dim: "#6E6E73",
-  hot1: "#F5501A", hot2: "#F98D1F",
+  bg: "#F2EDE9", panel: "#FFFFFF", panel2: "#C9DFF0",
+  line: "#0F2C56", text: "#0F2C56", dim: "#54657E",
+  hot1: "#D6453D", hot2: "#E8A21C",
+  suave: "#E1D8CE", // pistas y barras de progreso vacías sobre crema
 };
-const grad = { backgroundImage: `linear-gradient(90deg, ${C.hot1}, ${C.hot2})` };
-const gradText = { backgroundImage: `linear-gradient(90deg, ${C.hot1}, ${C.hot2})`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" };
-const DF = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif", letterSpacing: "-0.03em" };
-// Imagen de reserva (degradado de marca) si alguna foto no carga: evita el icono de "imagen rota".
-const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#F5501A'/><stop offset='1' stop-color='#F98D1F'/></linearGradient></defs><rect width='400' height='400' fill='#F5F5F7'/><circle cx='200' cy='210' r='78' fill='url(#g)' opacity='0.28'/><circle cx='200' cy='210' r='40' fill='url(#g)' opacity='0.5'/></svg>`)}`;
+const grad = { backgroundImage: "none", background: C.hot2 };
+const gradText = { color: C.hot1 };
+const DF = { fontFamily: "'Anton', 'Arial Narrow', sans-serif", letterSpacing: "0.015em", textTransform: "uppercase" as const };
+// Tipografías de apoyo: mono para el cuerpo, serif cursiva para acentos.
+const MONO = "'Azeret Mono', ui-monospace, 'Courier New', monospace";
+const SERIF = { fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic" as const };
+// Imagen de reserva (colores de marca) si alguna foto no carga: evita el icono de "imagen rota".
+const FALLBACK_IMG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='400' height='400' fill='#F2EDE9'/><circle cx='200' cy='210' r='78' fill='#E8A21C' opacity='0.5'/><circle cx='200' cy='210' r='40' fill='#D6453D' opacity='0.55'/></svg>`)}`;
 const onImgError = (e) => { const t = e.currentTarget; if (t.src !== FALLBACK_IMG) t.src = FALLBACK_IMG; };
 
-/* Botones de acción principales, estilo Apple: píldora compacta de tamaño
-   uniforme. El primario lleva el degradado de marca con texto blanco;
-   el secundario es gris translúcido con blur. Las microinteracciones
-   (hover, presión) viven en las clases .btn-cta y button:active. */
-const btnBase = { border: "none", borderRadius: 980, fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", padding: "13px 28px", minWidth: "min(220px, 100%)", transition: "transform .18s ease, filter .18s ease, box-shadow .18s ease" };
-const btnPrimario = { ...btnBase, ...grad, color: "#fff", boxShadow: "0 4px 16px rgba(245,80,26,.25)" };
-const btnSecundario = { ...btnBase, background: "rgba(29,29,31,.07)", color: C.text, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" };
+/* Botones de acción principales, estilo pegatina retro: rectángulo con borde
+   marino grueso y sombra dura desplazada. El primario es mostaza; el
+   secundario, blanco. Al pasar el ratón se "levantan" (la sombra crece) y al
+   pulsarlos se "aplastan" contra la página (clases .btn-cta y button:active). */
+const btnBase = { border: `2px solid ${C.line}`, borderRadius: 12, fontWeight: 600, fontSize: 13, letterSpacing: "0.09em", textTransform: "uppercase" as const, fontFamily: MONO, padding: "13px 26px", minWidth: "min(220px, 100%)", boxShadow: `4px 4px 0 ${C.line}`, transition: "transform .16s ease, box-shadow .16s ease, background .16s ease" };
+const btnPrimario = { ...btnBase, background: C.hot2, color: C.text };
+const btnSecundario = { ...btnBase, background: "#FFFFFF", color: C.text };
 
 const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
@@ -57,6 +84,7 @@ export default function App() {
   const [authAbierto, setAuthAbierto] = useState(false);
   const [planGuardado, setPlanGuardado] = useState(null);
   const set = (k, v) => setDatos((d) => ({ ...d, [k]: v }));
+  useScrollSuave();
   const { user } = useAuth();
   // Fase actual accesible dentro de callbacks asíncronos sin cerrar sobre un valor obsoleto.
   const faseRef = useRef(fase);
@@ -98,39 +126,55 @@ export default function App() {
 
   return (
     <RutinaCtx.Provider value={irARutina}>
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: MONO, fontSize: 14 }}>
       <style>{`
         @keyframes fadeUp { from { opacity:0; transform:translateY(26px);} to {opacity:1; transform:none;} }
         @keyframes kenburns { from { transform: scale(1);} to { transform: scale(1.12);} }
         @keyframes scanline { 0%{top:0%;} 100%{top:100%;} }
+        @keyframes marquesina { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         .fadeUp { animation: fadeUp .6s ease both; }
-        /* Microinteracciones tipo Apple: todo botón responde al hover y se
-           comprime ligeramente al pulsarlo; tarjetas e inputs devuelven
-           feedback suave (sombra al pasar, halo al enfocar). */
-        button { cursor:pointer; font-family:inherit; transition: background .18s ease, filter .18s ease, transform .18s ease, border-color .18s ease, box-shadow .18s ease, color .18s ease; }
+        /* Polaroids flotantes del hero: la capa exterior recibe el paralaje del
+           ratón (variables --px/--py) y la interior levita en bucle. Al pasar
+           el ratón por encima, la foto se endereza y crece un poco. */
+        @keyframes flotar { 0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); } 50% { transform: translateY(-13px) rotate(calc(var(--rot, 0deg) + 1.6deg)); } }
+        /* La posición (x/y) la controla GSAP (quickTo) sobre esta capa; el
+           bucle de levitación vive en .polaroid-marco, un elemento distinto. */
+        .polaroid { position: absolute; will-change: transform; z-index: 3; }
+        .polaroid:hover { z-index: 6; }
+        .polaroid-marco { animation: flotar var(--dur, 7s) ease-in-out infinite; background: #fff; border: 2px solid ${C.line}; border-radius: 10px; padding: 9px 9px 12px; box-shadow: 5px 6px 0 rgba(15,44,86,.85); transition: transform .3s cubic-bezier(.2,.8,.3,1.4); }
+        .polaroid:hover .polaroid-marco { animation-play-state: paused; transform: rotate(0deg) scale(1.07); }
+        @media (max-width: 1080px) { .polaroid { display: none; } }
+        @keyframes popIn { from { opacity: 0; transform: translateY(26px) rotate(-1.5deg) scale(.97); } to { opacity: 1; transform: none; } }
+        .popIn { animation: popIn .55s cubic-bezier(.2,.9,.3,1.15) both; }
+        /* Microinteracciones retro: los botones-pegatina se "levantan" al pasar
+           el ratón (la sombra dura crece) y se "aplastan" contra la página al
+           pulsarlos (la sombra desaparece). Las tarjetas hacen lo mismo. */
+        button { cursor:pointer; font-family:inherit; transition: background .16s ease, transform .16s ease, border-color .16s ease, box-shadow .16s ease, color .16s ease; }
         button:active { transform: scale(.97); }
         button:focus-visible { outline:2px solid ${C.hot1}; outline-offset:3px; }
-        .btn-cta:hover { filter: brightness(1.05); transform: translateY(-1px); }
-        .btn-cta:active { transform: scale(.97); }
-        .exwrap { transition: box-shadow .28s ease, border-color .18s ease; }
-        .exwrap:hover { box-shadow: 0 14px 34px rgba(0,0,0,.08); }
-        input[type=email], input[type=password], input[type=text], input:not([type]) { transition: border-color .2s ease, box-shadow .2s ease; }
-        input[type=email]:focus, input[type=password]:focus, input[type=text]:focus, input:not([type]):focus { outline: none; border-color: ${C.hot1} !important; box-shadow: 0 0 0 4px rgba(245,80,26,.12); }
+        .btn-cta:hover { transform: translate(-2px,-2px); box-shadow: 7px 7px 0 ${C.line} !important; }
+        .btn-cta:active { transform: translate(3px,3px); box-shadow: 0 0 0 ${C.line} !important; }
+        .exwrap { transition: box-shadow .22s ease, border-color .16s ease, transform .22s ease; }
+        .exwrap:hover { box-shadow: 6px 6px 0 ${C.line}; transform: translate(-2px,-2px); }
+        input[type=email], input[type=password], input[type=text], input:not([type]) { transition: border-color .2s ease, box-shadow .2s ease; font-family: inherit; }
+        input[type=email]:focus, input[type=password]:focus, input[type=text]:focus, input:not([type]):focus { outline: none; border-color: ${C.hot1} !important; box-shadow: 3px 3px 0 ${C.hot1}; }
         input[type=range]{ accent-color:${C.hot1}; }
         ::selection { background:${C.hot1}; color:#fff; }
-        @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+        @media (prefers-reduced-motion: reduce){ *{ animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
         .exwrap:hover .eximg { transform: scale(1.06); }
-        /* Navegación tipo Tesla: enlaces de texto planos que muestran una
-           pastilla translúcida al pasar el ratón. La cabecera vive siempre
-           sobre una foto (.sobre-foto → texto blanco, pastilla blanca);
-           el menú lateral es un panel claro (.sobre-claro → pastilla gris). */
-        .nav-item { background: transparent; border: none; color: inherit; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 980px; transition: background .2s ease; text-decoration: none; white-space: nowrap; }
-        .nav-item:hover, .nav-item.activo { background: rgba(23,26,32,.06); }
-        .sobre-foto .nav-item:hover, .sobre-foto .nav-item.activo { background: rgba(255,255,255,.16); backdrop-filter: blur(8px); }
-        .sobre-claro .nav-item:hover, .sobre-claro .nav-item.activo { background: rgba(23,26,32,.06); backdrop-filter: none; }
+        /* Navegación retro: enlaces monoespaciados en mayúsculas dentro de la
+           barra blanca; al pasar el ratón, pastilla celeste. El menú lateral
+           (.sobre-claro) usa el mismo tratamiento. */
+        .nav-item { background: transparent; border: none; color: ${C.text}; font-family: ${MONO}; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 14px; border-radius: 8px; transition: background .2s ease; text-decoration: none; white-space: nowrap; }
+        .nav-item:hover, .nav-item.activo { background: rgba(15,44,86,.08); }
+        .nav-item.activo { background: ${C.panel2}; }
+        .sobre-claro .nav-item:hover { background: rgba(15,44,86,.08); }
+        /* Marquesina superior: tira marina con el texto en bucle infinito. */
+        .marquesina { overflow: hidden; background: ${C.line}; color: ${C.bg}; }
+        .marquesina > div { display: inline-flex; white-space: nowrap; animation: marquesina 26s linear infinite; will-change: transform; }
+        .marquesina span { font-family: ${MONO}; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; padding: 7px 0; }
         @media (max-width: 900px) { .nav-escritorio { display: none !important; } }
         @media (min-width: 901px) { .nav-movil { display: none !important; } }
-        @keyframes menuIn { from { transform: translateX(100%); } to { transform: none; } }
         @media (max-width: 600px) { .cta-fila { flex-direction: column; align-items: stretch; } }
       `}</style>
       {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} onIrSeccion={irSeccion} />}
@@ -174,8 +218,8 @@ function AuthModal({ onClose }) {
 
   const input = { width: "100%", padding: "14px 16px", borderRadius: 12, background: C.bg, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15, marginTop: 10 };
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(23,26,32,.45)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: 20, zIndex: 100 }}>
-      <div onClick={(e) => e.stopPropagation()} className="fadeUp" style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 22, padding: 26, boxShadow: "0 24px 60px rgba(0,0,0,.16)" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,44,86,.5)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: 20, zIndex: 100 }}>
+      <div onClick={(e) => e.stopPropagation()} className="fadeUp" style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 16, padding: 26, border: `2px solid ${C.line}`, boxShadow: `8px 8px 0 ${C.line}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ ...DF, fontWeight: 800, fontSize: 22 }}>{modo === "login" ? "Iniciar sesión" : "Crear cuenta"}</div>
           <button onClick={onClose} aria-label="Cerrar" style={{ background: "none", border: "none", color: C.dim, fontSize: 24, lineHeight: 1 }}>×</button>
@@ -226,56 +270,202 @@ function CuentaChip({ onLogin, vertical = false }) {
   );
 }
 
-// Cabecera compartida por todas las pantallas, estilo Tesla: logo a la izquierda,
-// enlaces de texto centrados (escritorio), acciones contextuales a la derecha y
-// un botón "Menú" que abre el panel lateral en pantallas estrechas.
+// Tira de marquesina retro: texto en mayúsculas desplazándose en bucle.
+// El contenido se duplica para que el salto del bucle (-50%) no se note.
+function Marquesina({ texto }) {
+  const tira = `${Array(4).fill(texto).join("  ✶  ")}  ✶  `;
+  return (
+    <div className="marquesina" aria-hidden="true">
+      <div><span>{tira}</span><span>{tira}</span></div>
+    </div>
+  );
+}
+
+/* Enlace de menú con forma de cartel/pegatina que rebota con GSAP: al pasar el
+   ratón da un bote elástico (escala + giro leve + la sombra dura crece) y al
+   pulsarlo se aplasta y vuelve a botar. `variante` "chip" (barra de escritorio,
+   compacto) o "bloque" (menú móvil, ancho completo). El activo va en mostaza.
+   Con prefers-reduced-motion no anima, solo cambia la sombra. */
+function BotonCartel({ children, onClick, activo = false, variante = "chip", className = "", style }: any) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const grande = variante === "bloque";
+  const salta = () => {
+    if (REDUCE || !ref.current) return;
+    gsap.to(ref.current, { scale: grande ? 1.03 : 1.08, rotation: gsap.utils.random(-2.4, 2.4), y: -3, boxShadow: `6px 6px 0 ${C.line}`, duration: 0.55, ease: "elastic.out(1, 0.45)", overwrite: true });
+  };
+  const vuelve = () => {
+    if (REDUCE || !ref.current) return;
+    gsap.to(ref.current, { scale: 1, rotation: 0, y: 0, boxShadow: `3px 3px 0 ${C.line}`, duration: 0.3, ease: "power2.out", overwrite: true });
+  };
+  const aplasta = () => {
+    if (REDUCE || !ref.current) return;
+    gsap.fromTo(ref.current, { scale: 0.88, y: 1 }, { scale: grande ? 1.03 : 1.08, y: -3, duration: 0.5, ease: "elastic.out(1, 0.4)", overwrite: true });
+  };
+  return (
+    <button ref={ref} className={className} onClick={onClick} onMouseEnter={salta} onMouseLeave={vuelve} onPointerDown={aplasta}
+      style={{
+        background: activo ? C.hot2 : "#fff", border: `2px solid ${C.line}`, borderRadius: 10, boxShadow: `3px 3px 0 ${C.line}`,
+        color: C.text, fontFamily: MONO, fontWeight: 600, fontSize: grande ? 15 : 12, letterSpacing: "0.05em", textTransform: "uppercase",
+        padding: grande ? "13px 16px" : "8px 14px", transition: "none", whiteSpace: "nowrap",
+        ...(grande ? { width: "100%", textAlign: "left" as const } : {}), ...style,
+      }}>
+      {children}
+    </button>
+  );
+}
+
+// Cabecera compartida por todas las pantallas, estilo food-truck retro:
+// marquesina marina arriba y barra blanca tipo pegatina con el logo a la
+// izquierda, enlaces monoespaciados centrados (escritorio), acciones
+// contextuales a la derecha y un botón "Menú" en pantallas estrechas.
 // `onInicio` hace clicable el logo; `actual` resalta la sección activa.
 const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"], ["restaurantes", "Restaurantes"]];
 function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const irARutina = useContext(RutinaCtx);
-  const logo = <span style={{ ...DF, fontWeight: 800, fontSize: 20, letterSpacing: "0.16em" }}>PULSO<span style={gradText}>.</span></span>;
+  const logo = <span style={{ ...DF, fontSize: 19, letterSpacing: "0.14em" }}>PULSO<span style={{ color: C.hot1 }}>.</span></span>;
   return (
-    <header className="sobre-foto" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", gap: 8, padding: "14px 20px", color: "#fff" }}>
-      {onInicio
-        ? <button className="nav-item" onClick={onInicio} aria-label="Ir al inicio" style={{ padding: "6px 10px" }}>{logo}</button>
-        : <div style={{ padding: "6px 10px" }}>{logo}</div>}
-      <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
-        {irARutina && <button className={`nav-item${actual === "rutina" ? " activo" : ""}`} onClick={irARutina}>Mi rutina</button>}
-        {NAV_LINKS.map(([id, t]) => (
-          <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={() => onIrSeccion(id)}>{t}</button>
-        ))}
-      </nav>
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
-        {acciones}
-        <span className="nav-escritorio" style={{ display: "flex", alignItems: "center", gap: 4 }}><CuentaChip onLogin={onLogin} /></span>
-        <button className="nav-item nav-movil" onClick={() => setMenuAbierto(true)}>Menú</button>
+    <header style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20 }}>
+      <Marquesina texto={`${RECETAS.length}+ recetas con foto · Tu semana de comidas en segundos · PDF gratis · Recetas de la comunidad`} />
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, margin: "12px 14px 0", padding: "8px 14px", background: "#fff", border: `2px solid ${C.line}`, borderRadius: 14, boxShadow: `4px 4px 0 ${C.line}`, color: C.text }}>
+        {onInicio
+          ? <button className="nav-item" onClick={onInicio} aria-label="Ir al inicio" style={{ padding: "4px 10px" }}>{logo}</button>
+          : <div style={{ padding: "4px 10px" }}>{logo}</div>}
+        <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8 }}>
+          {irARutina && <BotonCartel activo={actual === "rutina"} onClick={irARutina}>Mi rutina</BotonCartel>}
+          {NAV_LINKS.map(([id, t]) => (
+            <BotonCartel key={id} activo={actual === id} onClick={() => onIrSeccion(id)}>{t}</BotonCartel>
+          ))}
+        </nav>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+          {acciones}
+          <span className="nav-escritorio" style={{ display: "flex", alignItems: "center", gap: 4 }}><CuentaChip onLogin={onLogin} /></span>
+          <button className="nav-item nav-movil" onClick={() => setMenuAbierto(true)}>Menú</button>
+        </div>
+        {menuAbierto && (
+          <MenuLateral onCerrar={() => setMenuAbierto(false)} onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onInicio} actual={actual} />
+        )}
       </div>
-      {menuAbierto && (
-        <MenuLateral onCerrar={() => setMenuAbierto(false)} onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onInicio} actual={actual} />
-      )}
     </header>
   );
 }
 
-// Panel lateral deslizante (menú móvil), estilo Tesla: lista vertical de
-// enlaces planos sobre un panel con blur que entra desde la derecha.
+// Panel lateral deslizante (menú móvil). La entrada y la salida las orquesta
+// una timeline de GSAP: el velo aparece, el panel entra desde la derecha y los
+// enlaces se revelan escalonados. Al cerrar se reproduce la timeline en
+// reversa y solo entonces se desmonta (por eso el cierre pasa por `cerrar`).
 function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
-  const ir = (fn) => () => { onCerrar(); fn(); };
   const irARutina = useContext(RutinaCtx);
-  const item = { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" };
+  const velo = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const tl = useRef<gsap.core.Timeline | null>(null);
+
+  useLayoutEffect(() => {
+    if (REDUCE) return; // sin animación: el panel se muestra tal cual
+    const ctx = gsap.context(() => {
+      const enlaces = panel.current!.querySelectorAll(".menu-enlace");
+      tl.current = gsap.timeline({ defaults: { ease: "power3.out" } })
+        .from(velo.current, { autoAlpha: 0, duration: 0.25 })
+        .from(panel.current, { xPercent: 100, duration: 0.4 }, "<")
+        .from(enlaces, { x: 24, autoAlpha: 0, stagger: 0.05, duration: 0.35 }, "-=0.15");
+    });
+    return () => ctx.revert();
+  }, []);
+
+  // Cierra con la animación en reversa; si no hay animación, cierra directo.
+  const cerrar = () => {
+    if (REDUCE || !tl.current) { onCerrar(); return; }
+    tl.current.eventCallback("onReverseComplete", onCerrar).timeScale(1.6).reverse();
+  };
+  const ir = (fn) => () => { fn(); cerrar(); };
   return (
-    <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 90 }}>
-      <div className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderLeft: `1px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4, animation: "menuIn .28s ease both" }}>
-        <button className="nav-item" onClick={onCerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
-        {onInicio && <button className="nav-item" onClick={ir(onInicio)} style={item}>Inicio</button>}
-        {irARutina && <button className={`nav-item${actual === "rutina" ? " activo" : ""}`} onClick={ir(irARutina)} style={item}>Mi rutina</button>}
+    <div ref={velo} onClick={cerrar} style={{ position: "fixed", inset: 0, background: "rgba(15,44,86,.45)", zIndex: 90 }}>
+      <div ref={panel} className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.98)", borderLeft: `2px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
+        <button className="nav-item menu-enlace" onClick={cerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
+        {onInicio && <BotonCartel className="menu-enlace" variante="bloque" onClick={ir(onInicio)}>Inicio</BotonCartel>}
+        {irARutina && <BotonCartel className="menu-enlace" variante="bloque" activo={actual === "rutina"} onClick={ir(irARutina)}>Mi rutina</BotonCartel>}
         {NAV_LINKS.map(([id, t]) => (
-          <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={item}>{t}</button>
+          <BotonCartel key={id} className="menu-enlace" variante="bloque" activo={actual === id} onClick={ir(() => onIrSeccion(id))}>{t}</BotonCartel>
         ))}
-        <div style={{ height: 1, background: C.line, margin: "10px 4px" }} />
-        <CuentaChip onLogin={ir(onLogin)} vertical />
+        <div className="menu-enlace" style={{ height: 1, background: C.line, margin: "10px 4px" }} />
+        <span className="menu-enlace"><CuentaChip onLogin={ir(onLogin)} vertical /></span>
       </div>
+    </div>
+  );
+}
+
+/* Aparece: revela su contenido con GSAP ScrollTrigger cuando entra en el
+   viewport, con un salto y giro tipo pegatina. Sincronizado con el scroll
+   suave de Lenis. Si el usuario pide menos movimiento, se muestra sin más. */
+function Aparece({ children, delay = 0, rot = 0 }: any) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || REDUCE) return;
+    const ctx = gsap.context(() => {
+      gsap.from(el, {
+        opacity: 0, y: 34, rotation: rot, scale: 0.97, duration: 0.6, ease: "back.out(1.5)", delay: delay / 1000,
+        scrollTrigger: { trigger: el, start: "top 88%", toggleActions: "play none none none" },
+      });
+    }, el);
+    return () => ctx.revert();
+  }, []);
+  return <div ref={ref}>{children}</div>;
+}
+
+/* Fotos flotantes del hero: polaroids giradas que levitan en bucle (CSS) y se
+   apartan del ratón cuando pasa cerca (paralaje + repulsión de cercanía),
+   como las fotos sueltas de pizza-amici. El seguimiento del ratón lo suaviza
+   gsap.quickTo (interpolación amortiguada). Solo escritorio (>1080px). */
+const POLAROIDS = [
+  { img: "ensalada", texto: "sin remordimientos", pos: { top: "23%", left: "5%" }, rot: -7, deriva: 30, dur: 7.2 },
+  { img: "batido", texto: "listo en 10 min", pos: { top: "56%", left: "10%" }, rot: 5, deriva: 55, dur: 8.4 },
+  { img: "carne", texto: "alto en proteína", pos: { top: "21%", right: "6%" }, rot: 6, deriva: 42, dur: 7.8 },
+  { img: "fruta", texto: "tu semana, resuelta", pos: { top: "58%", right: "11%" }, rot: -5, deriva: 68, dur: 9 },
+];
+function FotosFlotantes() {
+  const capa = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = capa.current;
+    if (!el || REDUCE) return;
+    const ctx = gsap.context(() => {
+      const fotos = Array.from(el.querySelectorAll<HTMLElement>(".polaroid"));
+      // Una interpolación amortiguada por eje y foto: el destino salta, la
+      // posición real lo persigue con suavidad (sin recolocar en cada frame).
+      const setX = fotos.map((f) => gsap.quickTo(f, "x", { duration: 0.6, ease: "power3.out" }));
+      const setY = fotos.map((f) => gsap.quickTo(f, "y", { duration: 0.6, ease: "power3.out" }));
+      const onMove = (e: MouseEvent) => {
+        const r = el.getBoundingClientRect();
+        fotos.forEach((foto, i) => {
+          const fr = foto.getBoundingClientRect();
+          const cx = fr.left + fr.width / 2, cy = fr.top + fr.height / 2;
+          // Paralaje de profundidad: cada foto sigue al ratón a su propio ritmo…
+          const deriva = POLAROIDS[i]?.deriva ?? 40;
+          let px = (e.clientX - (r.left + r.width / 2)) / deriva;
+          let py = (e.clientY - (r.top + r.height / 2)) / deriva;
+          // …y repulsión de cercanía: si el ratón se acerca, la foto se aparta.
+          const dx = cx - e.clientX, dy = cy - e.clientY;
+          const dist = Math.hypot(dx, dy);
+          const fuerza = Math.max(0, 1 - dist / 300) * 46;
+          if (dist > 1) { px += (dx / dist) * fuerza; py += (dy / dist) * fuerza; }
+          setX[i](px); setY[i](py);
+        });
+      };
+      window.addEventListener("mousemove", onMove);
+      return () => window.removeEventListener("mousemove", onMove);
+    }, el);
+    return () => ctx.revert();
+  }, []);
+  return (
+    <div ref={capa} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
+      {POLAROIDS.map((p) => (
+        <div key={p.img} className="polaroid" style={{ ...p.pos, pointerEvents: "auto", ["--rot" as any]: `${p.rot}deg`, ["--dur" as any]: `${p.dur}s` }}>
+          <div className="polaroid-marco">
+            <img src={U(FOODIMG[p.img], 400)} alt="" onError={onImgError} style={{ width: 148, height: 148, objectFit: "cover", display: "block", borderRadius: 5 }} />
+            <div style={{ ...SERIF, fontSize: 16, color: C.text, textAlign: "center", marginTop: 7 }}>{p.texto}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -285,27 +475,31 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar, onIrSeccion }) {
     <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
         <img src={HERO_IMG} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", animation: "kenburns 18s ease-out both" }} />
-        {/* La foto queda arriba (texto blanco) y se funde en blanco hacia la
-            zona de CTAs y cifras, que usa texto oscuro: transición tipo Tesla. */}
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(10,11,13,.55) 0%, rgba(10,11,13,.28) 42%, rgba(255,255,255,.88) 80%, #FFFFFF 100%)` }} />
-        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(900px 480px at 78% 12%, rgba(245,80,26,.16), transparent 62%)` }} />
+        {/* Velo marino sobre la foto que se funde en crema hacia la zona de
+            CTAs y cifras, donde el texto vuelve a ser tinta sobre papel. */}
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(15,44,86,.42) 0%, rgba(15,44,86,.22) 46%, rgba(242,237,233,.9) 82%, ${C.bg} 100%)` }} />
       </div>
       <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} />
-      <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", textAlign: "center", padding: "16vh 24px 0", color: "#fff", textShadow: "0 1px 22px rgba(0,0,0,.45)" }}>
-        <div style={{ fontSize: 12, letterSpacing: "0.32em", color: C.hot2, textTransform: "uppercase", marginBottom: 18, fontWeight: 700 }}>Tu plan. Tu mesa. Tus reglas.</div>
-        <h1 style={{ ...DF, fontSize: "clamp(42px, 8vw, 96px)", fontWeight: 800, lineHeight: 1, margin: 0 }}>Come con <span style={{ ...gradText, textShadow: "none" }}>intención.</span></h1>
-        <p style={{ color: "#F1F2F4", fontSize: 17, maxWidth: 560, lineHeight: 1.6, marginTop: 22 }}>Dinos tu objetivo, tus gustos y tus alergias. En segundos generamos tu semana de comidas completa, con cada receta ilustrada paso a paso.</p>
-      </main>
-      <div className="fadeUp" style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 30, padding: "40px 24px 6vh" }}>
-        <div className="cta-fila" style={{ display: "flex", gap: 14, justifyContent: "center", width: "100%", maxWidth: 600 }}>
-          <button className="btn-cta" onClick={onStart} style={btnPrimario}>Crear mi plan</button>
-          {planGuardado
-            ? <button className="btn-cta" onClick={onRetomar} style={btnSecundario}>Continuar con mi plan</button>
-            : <button className="btn-cta" onClick={() => onIrSeccion("recetario")} style={btnSecundario}>Explorar el recetario</button>}
+      <FotosFlotantes />
+      <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "17vh 24px 0" }}>
+        {/* Insignia tipo ticket: tarjeta blanca con doble borde marino,
+            ligeramente girada, como las pegatinas del food-truck. */}
+        <div style={{ background: "#fff", border: `3px solid ${C.line}`, borderRadius: 20, boxShadow: `8px 8px 0 ${C.line}`, padding: "34px 40px 36px", maxWidth: 620, textAlign: "center", transform: "rotate(-1.4deg)", outline: `2px solid #fff`, outlineOffset: -9 }}>
+          <div style={{ fontSize: 12, letterSpacing: "0.3em", color: C.hot1, textTransform: "uppercase", marginBottom: 14, fontWeight: 700 }}>✶ Tu plan · Tu mesa · Tus reglas ✶</div>
+          <h1 style={{ ...DF, fontSize: "clamp(40px, 7vw, 82px)", lineHeight: 0.98, margin: 0 }}>Come con <span style={gradText}>intención</span></h1>
+          <p style={{ color: C.text, fontSize: 13.5, maxWidth: 460, lineHeight: 1.7, margin: "18px auto 0" }}>Dinos tu objetivo, tus gustos y tus alergias. En segundos generamos tu semana de comidas completa, con cada receta ilustrada paso a paso.</p>
         </div>
-        <div style={{ display: "flex", gap: 36, flexWrap: "wrap", justifyContent: "center" }}>
-          {[["4", "objetivos"], ["7 días", "de dieta"], [`${RECETAS.length}`, "recetas con foto"]].map(([n, t]) => (
-            <div key={t} style={{ textAlign: "center" }}><div style={{ ...DF, fontSize: 20, fontWeight: 800 }}>{n}</div><div style={{ fontSize: 11, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>{t}</div></div>
+      </main>
+      <div className="fadeUp" style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 30, padding: "44px 24px 6vh" }}>
+        <div className="cta-fila" style={{ display: "flex", gap: 16, justifyContent: "center", width: "100%", maxWidth: 600 }}>
+          <button className="btn-cta" onClick={onStart} style={{ ...btnPrimario, transform: "rotate(-1deg)" }}>Crear mi plan</button>
+          {planGuardado
+            ? <button className="btn-cta" onClick={onRetomar} style={{ ...btnSecundario, transform: "rotate(1deg)" }}>Continuar con mi plan</button>
+            : <button className="btn-cta" onClick={() => onIrSeccion("recetario")} style={{ ...btnSecundario, transform: "rotate(1deg)" }}>Explorar el recetario</button>}
+        </div>
+        <div style={{ display: "flex", gap: 40, flexWrap: "wrap", justifyContent: "center" }}>
+          {[["4", "objetivos"], ["7 días", "de dieta"], [`${RECETAS.length}+`, "recetas con foto"]].map(([n, t]) => (
+            <div key={t} style={{ textAlign: "center" }}><div style={{ ...DF, fontSize: 26, color: C.hot1 }}>{n}</div><div style={{ fontSize: 10, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 3, fontWeight: 600 }}>{t}</div></div>
           ))}
         </div>
       </div>
@@ -321,18 +515,18 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
   // Alterna un valor dentro de un campo multi-select (alergias, noGusta).
   const toggle = (k, v) => set(k, datos[k].includes(v) ? datos[k].filter((x) => x !== v) : [...datos[k], v]);
   const chip = (activo) => ({
-    padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14,
-    border: `1.5px solid ${activo ? C.hot1 : C.line}`, color: activo ? "#0A0B0D" : C.dim,
+    padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 14,
+    border: `1.5px solid ${activo ? C.hot1 : C.line}`, color: activo ? "#0F2C56" : C.dim,
     ...(activo ? grad : { background: C.panel }),
   });
   return (
     <div style={{ minHeight: "100vh", maxWidth: 860, margin: "0 auto", padding: "26px 18px 40px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40 }}>
-        <button onClick={() => (paso === 0 ? onBack() : setPaso(paso - 1))} style={{ background: "none", border: `1px solid ${C.line}`, color: C.dim, borderRadius: 999, width: 42, height: 42, fontSize: 18 }} aria-label="Volver">←</button>
+        <button onClick={() => (paso === 0 ? onBack() : setPaso(paso - 1))} style={{ background: "none", border: `1px solid ${C.line}`, color: C.dim, borderRadius: 9, width: 42, height: 42, fontSize: 18 }} aria-label="Volver">←</button>
         <div style={{ flex: 1, display: "flex", gap: 6 }}>
           {pasos.map((p, i) => (
             <div key={p} style={{ flex: 1 }}>
-              <div style={{ height: 5, borderRadius: 4, background: i <= paso ? undefined : C.line, ...(i <= paso ? grad : {}) }} />
+              <div style={{ height: 6, borderRadius: 4, border: `1px solid ${C.line}`, background: i <= paso ? C.hot2 : C.suave }} />
               <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: i === paso ? C.text : C.dim, marginTop: 8 }}>{p}</div>
             </div>
           ))}
@@ -347,14 +541,14 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
               {OBJETIVOS.map((o) => {
                 const activo = datos.objetivo === o.id;
                 return (
-                  <button key={o.id} onClick={() => set("objetivo", o.id)} style={{ position: "relative", height: 200, borderRadius: 20, overflow: "hidden", border: `2px solid ${activo ? C.hot1 : "transparent"}`, padding: 0, textAlign: "left", boxShadow: activo ? "0 10px 40px rgba(245,80,26,.22)" : "none", transition: "border-color .15s" }}>
+                  <button key={o.id} onClick={() => set("objetivo", o.id)} style={{ position: "relative", height: 200, borderRadius: 16, overflow: "hidden", border: `2px solid ${activo ? C.hot1 : C.line}`, padding: 0, textAlign: "left", boxShadow: activo ? `6px 6px 0 ${C.line}` : "none", transform: activo ? "translate(-2px,-2px)" : "none", transition: "border-color .15s, box-shadow .2s, transform .2s" }}>
                     <img src={o.img} alt="" onError={onImgError} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-                    <div style={{ position: "absolute", inset: 0, background: activo ? "linear-gradient(180deg, rgba(245,80,26,.25), rgba(10,11,13,.9))" : "linear-gradient(180deg, rgba(10,11,13,.15), rgba(10,11,13,.88))" }} />
+                    <div style={{ position: "absolute", inset: 0, background: activo ? "linear-gradient(180deg, rgba(214,69,61,.3), rgba(15,44,86,.94))" : "linear-gradient(180deg, rgba(15,44,86,.15), rgba(15,44,86,.9))" }} />
                     <div style={{ position: "absolute", left: 20, right: 20, bottom: 18 }}>
                       <div style={{ ...DF, fontWeight: 800, fontSize: 24, color: "#fff" }}>{o.titulo}</div>
                       <div style={{ color: "#D7DADF", fontSize: 13, marginTop: 4 }}>{o.desc}</div>
                     </div>
-                    {activo && <div style={{ position: "absolute", top: 14, right: 14, ...grad, color: "#0A0B0D", fontWeight: 800, borderRadius: 999, width: 30, height: 30, display: "grid", placeItems: "center", fontSize: 16 }}>✓</div>}
+                    {activo && <div style={{ position: "absolute", top: 14, right: 14, ...grad, color: "#0F2C56", fontWeight: 800, borderRadius: 9, width: 30, height: 30, display: "grid", placeItems: "center", fontSize: 16 }}>✓</div>}
                   </button>
                 );
               })}
@@ -367,7 +561,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
             <p style={{ color: C.dim, marginBottom: 28 }}>Con esto calculamos tus calorías y macros exactos.</p>
             <div style={{ display: "flex", gap: 12, marginBottom: 26 }}>
               {["hombre", "mujer"].map((s) => (
-                <button key={s} onClick={() => set("sexo", s)} style={{ flex: 1, padding: 16, borderRadius: 14, textTransform: "capitalize", fontWeight: 700, fontSize: 16, color: C.text, background: datos.sexo === s ? "linear-gradient(135deg, rgba(245,80,26,.12), rgba(249,141,31,.06))" : C.panel, border: `1.5px solid ${datos.sexo === s ? C.hot1 : C.line}` }}>{s === "hombre" ? "♂ Hombre" : "♀ Mujer"}</button>
+                <button key={s} onClick={() => set("sexo", s)} style={{ flex: 1, padding: 16, borderRadius: 14, textTransform: "capitalize", fontWeight: 700, fontSize: 16, color: C.text, background: datos.sexo === s ? "#C9DFF0" : C.panel, border: `1.5px solid ${datos.sexo === s ? C.hot1 : C.line}` }}>{s === "hombre" ? "♂ Hombre" : "♀ Mujer"}</button>
               ))}
             </div>
             {[["edad", "Edad", 14, 80, "años"], ["peso", "Peso", 40, 160, "kg"], ["altura", "Altura", 140, 210, "cm"]].map(([k, label, min, max, u]) => (
@@ -387,7 +581,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
             <p style={{ color: C.dim, marginBottom: 28 }}>Todas las recetas de tu plan la respetarán.</p>
             <div style={{ display: "grid", gap: 12 }}>
               {TIPOS_DIETA.map((t) => (
-                <button key={t.id} onClick={() => set("tipoDieta", t.id)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.tipoDieta === t.id ? "linear-gradient(135deg, rgba(245,80,26,.12), rgba(249,141,31,.06))" : C.panel, border: `1.5px solid ${datos.tipoDieta === t.id ? C.hot1 : C.line}` }}>
+                <button key={t.id} onClick={() => set("tipoDieta", t.id)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.tipoDieta === t.id ? "#C9DFF0" : C.panel, border: `1.5px solid ${datos.tipoDieta === t.id ? C.hot1 : C.line}` }}>
                   <div style={{ ...DF, fontWeight: 800, fontSize: 17 }}>{t.titulo}</div>
                   <div style={{ color: C.dim, fontSize: 13, marginTop: 3 }}>{t.desc}</div>
                 </button>
@@ -420,7 +614,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
             <p style={{ color: C.dim, marginBottom: 28 }}>Repartiremos tus calorías entre ellas.</p>
             <div style={{ display: "grid", gap: 12 }}>
               {[3, 4, 5].map((n) => (
-                <button key={n} onClick={() => set("comidasDia", n)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.comidasDia === n ? "linear-gradient(135deg, rgba(245,80,26,.12), rgba(249,141,31,.06))" : C.panel, border: `1.5px solid ${datos.comidasDia === n ? C.hot1 : C.line}` }}>
+                <button key={n} onClick={() => set("comidasDia", n)} style={{ textAlign: "left", padding: "18px 20px", borderRadius: 16, color: C.text, background: datos.comidasDia === n ? "#C9DFF0" : C.panel, border: `1.5px solid ${datos.comidasDia === n ? C.hot1 : C.line}` }}>
                   <div style={{ ...DF, fontWeight: 800, fontSize: 22 }}>{n} <span style={{ fontSize: 13, fontWeight: 400, color: C.dim }}>comidas</span></div>
                   <div style={{ color: C.dim, fontSize: 13, marginTop: 3 }}>{REPARTO[n].map((f) => f.nombre).join(" · ")}</div>
                 </button>
@@ -429,7 +623,7 @@ function Formulario({ datos, set, paso, setPaso, onFinish, onBack }) {
           </>
         )}
       </div>
-      <button className="btn-cta" onClick={next} disabled={!puedeSeguir} style={{ ...btnPrimario, ...(puedeSeguir ? {} : { backgroundImage: "none", background: C.panel2, color: C.dim }), marginTop: 34, width: "100%", padding: 15, fontSize: 15, opacity: puedeSeguir ? 1 : 0.6, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < ultimo ? "Continuar" : "Generar mi plan"}</button>
+      <button className="btn-cta" onClick={next} disabled={!puedeSeguir} style={{ ...btnPrimario, ...(puedeSeguir ? {} : { background: C.suave, color: C.dim, boxShadow: "none" }), marginTop: 34, width: "100%", padding: 15, fontSize: 14, opacity: puedeSeguir ? 1 : 0.7, cursor: puedeSeguir ? "pointer" : "not-allowed" }}>{paso < ultimo ? "Continuar" : "Generar mi plan"}</button>
     </div>
   );
 }
@@ -446,7 +640,7 @@ function Scan({ onDone }) {
         <div style={{ position: "absolute", left: 0, right: 0, height: 3, ...grad, boxShadow: `0 0 24px ${C.hot1}`, animation: "scanline 1.4s linear infinite" }} />
       </div>
       <div className="fadeUp" key={i} style={{ ...DF, fontSize: 22, fontWeight: 700 }}>{frases[Math.min(i, frases.length - 1)]}</div>
-      <div style={{ width: 260, height: 4, background: C.line, borderRadius: 4, marginTop: 22, overflow: "hidden" }}>
+      <div style={{ width: 260, height: 6, background: C.suave, border: `1px solid ${C.line}`, borderRadius: 4, marginTop: 22, overflow: "hidden" }}>
         <div style={{ height: "100%", ...grad, width: `${Math.min(100, ((i + 1) / frases.length) * 100)}%`, transition: "width .7s ease" }} />
       </div>
     </div>
@@ -501,7 +695,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     const space = (h = 8) => { y += h; };
     const rule = () => { ensure(16); doc.setDrawColor(224); doc.line(margin, y, pageW - margin, y); y += 16; };
 
-    line("PULSO", { size: 24, style: "bold", color: [245, 80, 26], gap: 3 });
+    line("PULSO", { size: 24, style: "bold", color: [214, 69, 61], gap: 3 });
     line("Tu plan de alimentación personalizado", { size: 15, style: "bold" });
     space(4);
     line(`Objetivo: ${obj?.titulo}   |   Dieta: ${tipoDieta?.titulo}   |   ${datos.comidasDia} comidas/día`, { size: 10, color: [110, 110, 110], gap: 3 });
@@ -515,7 +709,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     space(6);
     rule();
 
-    line("DIETA SEMANAL", { size: 15, style: "bold", color: [245, 80, 26] });
+    line("DIETA SEMANAL", { size: 15, style: "bold", color: [214, 69, 61] });
     space(4);
     dieta.forEach((d) => {
       ensure(50);
@@ -560,7 +754,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     const thumbs: Record<string, string | null> = {};
     await Promise.all(recetario.map(async (r) => { thumbs[r.id] = await cargarThumb(U(FOODIMG[r.img] || FOODIMG.otro, 200)); }));
 
-    line("RECETARIO", { size: 15, style: "bold", color: [245, 80, 26] });
+    line("RECETARIO", { size: 15, style: "bold", color: [214, 69, 61] });
     space(4);
     recetario.forEach((r) => {
       ensure(TH + 10);
@@ -592,7 +786,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
     <div>
       <div style={{ position: "relative", height: 340, overflow: "hidden" }}>
         <img src={obj?.img} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.45) 0%, rgba(255,255,255,.75) 62%, #FFFFFF 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(15,44,86,.4) 0%, rgba(242,237,233,.82) 62%, #F2EDE9 100%)" }} />
         <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} onInicio={onReset} actual="rutina" acciones={
           <>
             {enabled && user && guardado && <span style={{ fontSize: 12, color: C.hot2, fontWeight: 700, padding: "0 8px" }}>✓ Guardado</span>}
@@ -618,7 +812,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
         <div className="fadeUp" style={{ marginTop: 26 }}>
           <div style={{ position: "relative", height: 150, borderRadius: 20, overflow: "hidden", marginBottom: 14 }}>
             <img src={BANNER_DIETA} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(10,11,13,.72), rgba(10,11,13,.2))", display: "flex", alignItems: "center", padding: "0 26px" }}>
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(15,44,86,.85), rgba(15,44,86,.25))", display: "flex", alignItems: "center", padding: "0 26px" }}>
               <div style={{ color: "#fff" }}>
                 <div style={{ ...DF, fontSize: 24, fontWeight: 800 }}>Tu semana de comidas</div>
                 <div style={{ color: "rgba(255,255,255,.78)", fontSize: 13, marginTop: 4 }}>~{m.kcal} kcal · {m.prot} g proteína al día</div>
@@ -628,16 +822,16 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
           {(datos.tipoDieta !== "omnivora" || alergiasNombres.length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
               {datos.tipoDieta !== "omnivora" && (
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.hot2, border: `1px solid ${C.line}`, background: C.panel, borderRadius: 999, padding: "6px 14px" }}>🥗 {tipoDieta?.titulo}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.hot2, border: `1px solid ${C.line}`, background: C.panel, borderRadius: 9, padding: "6px 14px" }}>🥗 {tipoDieta?.titulo}</span>
               )}
               {alergiasNombres.map((n) => (
-                <span key={n} style={{ fontSize: 12, fontWeight: 700, color: C.hot2, border: `1px solid ${C.line}`, background: C.panel, borderRadius: 999, padding: "6px 14px" }}>🚫 Sin {n.toLowerCase()}</span>
+                <span key={n} style={{ fontSize: 12, fontWeight: 700, color: C.hot2, border: `1px solid ${C.line}`, background: C.panel, borderRadius: 9, padding: "6px 14px" }}>🚫 Sin {n.toLowerCase()}</span>
               ))}
             </div>
           )}
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 18 }}>
             {dieta.map((d, i) => (
-              <button key={d.dia} onClick={() => setDiaDieta(i)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${diaDieta === i ? C.hot1 : C.line}`, color: diaDieta === i ? "#0A0B0D" : C.dim, ...(diaDieta === i ? grad : { background: C.panel }) }}>{d.dia}</button>
+              <button key={d.dia} onClick={() => setDiaDieta(i)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 14, border: `1.5px solid ${diaDieta === i ? C.hot1 : C.line}`, color: diaDieta === i ? "#0F2C56" : C.dim, ...(diaDieta === i ? grad : { background: C.panel }) }}>{d.dia}</button>
             ))}
           </div>
           <div style={{ display: "grid", gap: 14 }}>
@@ -688,7 +882,7 @@ function DetalleReceta({ ingredientes, pasos, youtube }) {
       <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Ingredientes</div>
       <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
         {ingredientes.map((ing) => (
-          <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#3F454C" }}>
+          <li key={ing.nombre} style={{ display: "flex", gap: 10, fontSize: 14, lineHeight: 1.45, color: "#3A4A66" }}>
             <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 13, flexShrink: 0, minWidth: 74 }}>{ing.cantidad}</span>{ing.nombre}
           </li>
         ))}
@@ -696,13 +890,13 @@ function DetalleReceta({ ingredientes, pasos, youtube }) {
       <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "18px 0 10px" }}>Modo de elaboración</div>
       <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
         {pasos.map((p, pi) => (
-          <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#3F454C" }}>
+          <li key={pi} style={{ display: "flex", gap: 12, fontSize: 14, lineHeight: 1.55, color: "#3A4A66" }}>
             <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{pi + 1}</span>{p}
           </li>
         ))}
       </ol>
-      <a href={youtube} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(29,29,31,.06)", borderRadius: 980, padding: "11px 20px", fontWeight: 600, fontSize: 14, color: C.text }}>
-        <span style={{ ...grad, color: "#0A0B0D", borderRadius: 999, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
+      <a href={youtube} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 18, textDecoration: "none", background: "rgba(15,44,86,.08)", borderRadius: 10, padding: "11px 20px", fontWeight: 600, fontSize: 14, color: C.text }}>
+        <span style={{ ...grad, color: "#0F2C56", borderRadius: 9, width: 26, height: 26, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▶</span>
         Ver vídeo de la receta en YouTube
       </a>
     </div>
@@ -714,11 +908,11 @@ function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion,
   return (
     <div style={{ position: "relative", height: 300, overflow: "hidden" }}>
       <img src={banner} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,11,13,.45) 0%, rgba(255,255,255,.75) 62%, #FFFFFF 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(15,44,86,.4) 0%, rgba(242,237,233,.82) 62%, #F2EDE9 100%)" }} />
       <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} actual={actual} acciones={
-        <button className="nav-item" onClick={onBack}>← Volver</button>
+        <button className="nav-item" onClick={onBack}>« Volver</button>
       } />
-      <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px", color: C.text }}>
+      <div className="popIn" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px", color: C.text }}>
         <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot1, fontWeight: 700 }}>{kicker}</div>
         <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{titulo}</h1>
       </div>
@@ -729,7 +923,7 @@ function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion,
 // Ficha expandible de receta, compartida por el recetario y la sección de cine.
 // `r` es un modelo unificado: etiqueta pequeña, nombre, kcal y fotos opcionales
 // (escena de la obra y plato real) más el detalle (ingredientes, pasos, youtube).
-function FichaReceta({ r, abierto, onToggle, delay = 0, onBorrar }: any) {
+function FichaReceta({ r, abierto, onToggle, onBorrar }: any) {
   const generica = U(FOODIMG[r.img] || FOODIMG.otro, 600);
   const thumb = r.fotoEscena || r.fotoPlato || generica;
   const plato = r.fotoPlato || generica;
@@ -737,7 +931,7 @@ function FichaReceta({ r, abierto, onToggle, delay = 0, onBorrar }: any) {
   // y, si también falla, onImgError pinta el degradado de marca.
   const conRespaldo = (e) => { const t = e.currentTarget; if (t.src !== generica) t.src = generica; else onImgError(e); };
   return (
-    <div className="exwrap fadeUp" style={{ animationDelay: `${delay}ms`, background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
+    <div className="exwrap" style={{ background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
       <button onClick={onToggle} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
         <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
           <img className="eximg" src={thumb} alt={r.nombre} loading="lazy" onError={conRespaldo} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
@@ -761,7 +955,7 @@ function FichaReceta({ r, abierto, onToggle, delay = 0, onBorrar }: any) {
           {r.escena && (r.fotoEscena ? (
             <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", marginBottom: 16, border: `1px solid ${C.line}` }}>
               <img src={r.fotoEscena} alt={r.nombre} loading="lazy" onError={onImgError} style={{ width: "100%", aspectRatio: "21/9", objectFit: "cover", display: "block" }} />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 35%, rgba(10,11,13,.92))", display: "flex", alignItems: "flex-end", padding: "14px 16px" }}>
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 35%, rgba(15,44,86,.94))", display: "flex", alignItems: "flex-end", padding: "14px 16px" }}>
                 <p style={{ margin: 0, color: "#E8EAEE", fontSize: 13.5, lineHeight: 1.55, fontStyle: "italic", textShadow: "0 1px 8px rgba(0,0,0,.9)" }}>{r.escena}</p>
               </div>
             </div>
@@ -773,7 +967,7 @@ function FichaReceta({ r, abierto, onToggle, delay = 0, onBorrar }: any) {
             <DetalleReceta ingredientes={r.ingredientes} pasos={r.pasos} youtube={r.youtube} />
           </div>
           {onBorrar && (
-            <button onClick={onBorrar} style={{ marginTop: 16, background: "rgba(200,30,30,.08)", border: "1.5px solid rgba(200,30,30,.35)", color: "#B42318", borderRadius: 980, padding: "9px 20px", fontWeight: 600, fontSize: 13.5 }}>
+            <button onClick={onBorrar} style={{ marginTop: 16, background: "rgba(200,30,30,.08)", border: "1.5px solid rgba(200,30,30,.35)", color: "#B42318", borderRadius: 10, padding: "9px 20px", fontWeight: 600, fontSize: 13.5 }}>
               🗑 Borrar esta receta
             </button>
           )}
@@ -803,12 +997,14 @@ function Cine({ onBack, onLogin, onIrSeccion }) {
         <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Platos míticos de tus series y películas favoritas, con la imagen de la obra y su receta completa para hacerlos en casa. Son un capricho: no cuentan para tu plan semanal ni salen en el PDF.</p>
         <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
           {[["todas", "Todas"], ["serie", "Series"], ["peli", "Películas"]].map(([id, t]) => (
-            <button key={id} onClick={() => { setFiltro(id); setAbierta(null); }} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${filtro === id ? C.hot1 : C.line}`, color: filtro === id ? "#0A0B0D" : C.dim, ...(filtro === id ? grad : { background: C.panel }) }}>{t}</button>
+            <button key={id} onClick={() => { setFiltro(id); setAbierta(null); }} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 14, border: `1.5px solid ${filtro === id ? C.hot1 : C.line}`, color: filtro === id ? "#0F2C56" : C.dim, ...(filtro === id ? grad : { background: C.panel }) }}>{t}</button>
           ))}
         </div>
         <div style={{ display: "grid", gap: 14 }}>
           {lista.map((r, i) => (
-            <FichaReceta key={r.id} r={fichaDeCine(r)} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={i * 55} />
+            <Aparece key={r.id} delay={Math.min(i, 6) * 60} rot={i % 2 ? 1.4 : -1.4}>
+              <FichaReceta r={fichaDeCine(r)} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} />
+            </Aparece>
           ))}
         </div>
         <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>🍿 Estos platos son homenajes a sus series y películas: disfrútalos de vez en cuando, sin remordimientos. Tu plan semanal sigue intacto.</div>
@@ -870,11 +1066,11 @@ function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
         )}
         <div className="fadeUp" style={{ position: "relative", marginBottom: 16 }}>
           <span style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", fontSize: 16, pointerEvents: "none" }}>🔍</span>
-          <input value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setAbierta(null); }} placeholder="Busca por nombre o ingrediente: salmón, avena, sándwich…" aria-label="Buscar receta" style={{ width: "100%", boxSizing: "border-box", padding: "16px 20px 16px 50px", borderRadius: 999, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
+          <input value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setAbierta(null); }} placeholder="Busca por nombre o ingrediente: salmón, avena, sándwich…" aria-label="Buscar receta" style={{ width: "100%", boxSizing: "border-box", padding: "16px 20px 16px 50px", borderRadius: 9, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
         </div>
         <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
           {CATS_RECETARIO.map(([id, t]) => (
-            <button key={id} onClick={() => { setCat(id); setAbierta(null); }} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${cat === id ? C.hot1 : C.line}`, color: cat === id ? "#0A0B0D" : C.dim, ...(cat === id ? grad : { background: C.panel }) }}>{t}</button>
+            <button key={id} onClick={() => { setCat(id); setAbierta(null); }} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 14, border: `1.5px solid ${cat === id ? C.hot1 : C.line}`, color: cat === id ? "#0F2C56" : C.dim, ...(cat === id ? grad : { background: C.panel }) }}>{t}</button>
           ))}
         </div>
         <div style={{ color: C.dim, fontSize: 13, marginBottom: 14 }}>{lista.length === 1 ? "1 receta" : `${lista.length} recetas`}</div>
@@ -888,8 +1084,10 @@ function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
         ) : (
           <div style={{ display: "grid", gap: 14 }}>
             {lista.map((r, i) => (
-              <FichaReceta key={r.id} r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={Math.min(i, 8) * 45}
-                onBorrar={r.categoria === "comunidad" && puedeBorrarReceta(user, r) ? () => borrarComunidad(r.id) : undefined} />
+              <Aparece key={r.id} delay={Math.min(i, 6) * 55} rot={i % 2 ? 1.4 : -1.4}>
+                <FichaReceta r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)}
+                  onBorrar={r.categoria === "comunidad" && puedeBorrarReceta(user, r) ? () => borrarComunidad(r.id) : undefined} />
+              </Aparece>
             ))}
           </div>
         )}
@@ -941,7 +1139,7 @@ function CrearReceta({ onVolver, onLogin, onIrSeccion }) {
 
   const etiqueta = { fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase" as const, margin: "24px 0 10px" };
   const inputBase = { boxSizing: "border-box" as const, padding: "13px 16px", borderRadius: 14, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15, width: "100%" };
-  const chip = (activo) => ({ flexShrink: 0, padding: "9px 16px", borderRadius: 999, fontWeight: 700, fontSize: 13.5, border: `1.5px solid ${activo ? C.hot1 : C.line}`, color: activo ? "#0A0B0D" : C.dim, ...(activo ? grad : { background: C.panel }) });
+  const chip = (activo) => ({ flexShrink: 0, padding: "9px 16px", borderRadius: 9, fontWeight: 700, fontSize: 13.5, border: `1.5px solid ${activo ? C.hot1 : C.line}`, color: activo ? "#0F2C56" : C.dim, ...(activo ? grad : { background: C.panel }) });
 
   return (
     <div>
@@ -999,7 +1197,7 @@ function CrearReceta({ onVolver, onLogin, onIrSeccion }) {
             </div>
           ))}
         </div>
-        <button onClick={() => setPasos((l) => [...l, ""])} style={{ marginTop: 10, background: "rgba(29,29,31,.06)", border: "none", borderRadius: 980, padding: "9px 18px", fontWeight: 600, fontSize: 13.5, color: C.text }}>+ Añadir paso</button>
+        <button onClick={() => setPasos((l) => [...l, ""])} style={{ marginTop: 10, background: "rgba(15,44,86,.08)", border: "none", borderRadius: 10, padding: "9px 18px", fontWeight: 600, fontSize: 13.5, color: C.text }}>+ Añadir paso</button>
 
         {errores.length > 0 && (
           <div style={{ marginTop: 22, background: "rgba(200,30,30,.06)", border: "1.5px solid rgba(200,30,30,.3)", borderRadius: 16, padding: "14px 18px" }}>
@@ -1040,13 +1238,13 @@ function Restaurantes({ datos, onBack, onLogin, onIrSeccion }) {
         <form className="fadeUp" onSubmit={buscar} style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: "1 1 260px" }}>
             <span style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", fontSize: 16, pointerEvents: "none" }}>📍</span>
-            <input value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="Ciudad o zona: Madrid, Malasaña, Valencia…" aria-label="Ciudad o zona" style={{ width: "100%", boxSizing: "border-box", padding: "16px 20px 16px 50px", borderRadius: 999, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
+            <input value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="Ciudad o zona: Madrid, Malasaña, Valencia…" aria-label="Ciudad o zona" style={{ width: "100%", boxSizing: "border-box", padding: "16px 20px 16px 50px", borderRadius: 9, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
           </div>
           <button className="btn-cta" type="submit" disabled={!lugar.trim()} style={{ ...btnPrimario, minWidth: 0, padding: "13px 32px", opacity: lugar.trim() ? 1 : 0.55 }}>Buscar</button>
         </form>
         <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
           {TIPOS_RESTAURANTE.map(([id, t]) => (
-            <button key={id} onClick={() => elegirTipo(id)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 999, fontWeight: 700, fontSize: 14, border: `1.5px solid ${tipo === id ? C.hot1 : C.line}`, color: tipo === id ? "#fff" : C.dim, ...(tipo === id ? grad : { background: C.panel }) }}>{t}</button>
+            <button key={id} onClick={() => elegirTipo(id)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 14, border: `1.5px solid ${tipo === id ? C.hot1 : C.line}`, color: tipo === id ? "#fff" : C.dim, ...(tipo === id ? grad : { background: C.panel }) }}>{t}</button>
           ))}
         </div>
         {busqueda ? (
