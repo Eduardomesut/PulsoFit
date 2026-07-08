@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  RECETAS, RECETAS_CINE, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS, OBJETIVOS,
+  RECETAS, RECETAS_CINE, RECETAS_ACTUALIDAD, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS, OBJETIVOS,
   filtrarRecetas,
 } from "./logica";
 
@@ -14,13 +14,13 @@ const IDS_ALIMENTOS = ALIMENTOS.map((a) => a.id);
 const IDS_OBJETIVOS = OBJETIVOS.map((o) => o.id);
 
 describe("catálogo RECETAS", () => {
-  it("los ids son únicos (también frente a las recetas de cine)", () => {
-    const ids = [...RECETAS, ...RECETAS_CINE].map((r) => r.id);
+  it("los ids son únicos (también frente a cine y actualidad)", () => {
+    const ids = [...RECETAS, ...RECETAS_CINE, ...RECETAS_ACTUALIDAD].map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("cada receta referencia una imagen existente en FOODIMG", () => {
-    for (const r of [...RECETAS, ...RECETAS_CINE]) {
+    for (const r of [...RECETAS, ...RECETAS_CINE, ...RECETAS_ACTUALIDAD]) {
       expect(FOODIMG, `receta ${r.id}`).toHaveProperty(r.img);
     }
   });
@@ -86,6 +86,20 @@ describe("catálogo RECETAS_CINE", () => {
       expect(r.escena.length).toBeGreaterThan(0);
       expect(r.ingredientes.length).toBeGreaterThan(0);
       expect(r.pasos.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("catálogo RECETAS_ACTUALIDAD", () => {
+  it("cada ficha de actualidad está completa y bien formada", () => {
+    const TEMAS = ["deporte", "cultura", "efemeride", "mundo"];
+    for (const r of RECETAS_ACTUALIDAD) {
+      expect(TEMAS, `tema de ${r.id}`).toContain(r.categoria);
+      expect(r.titular.length, `titular de ${r.id}`).toBeGreaterThan(0);
+      expect(r.plato.length, `plato de ${r.id}`).toBeGreaterThan(0);
+      expect(/^\d{4}-\d{2}-\d{2}$/.test(r.fecha), `fecha de ${r.id}`).toBe(true);
+      expect(r.ingredientes.length, `ingredientes de ${r.id}`).toBeGreaterThan(0);
+      expect(r.pasos.length, `pasos de ${r.id}`).toBeGreaterThan(0);
     }
   });
 });

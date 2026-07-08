@@ -25,7 +25,7 @@ function useScrollSuave() {
 }
 import {
   U, youtubeUrl, normalizar, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS,
-  RECETAS, RECETAS_CINE, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
+  RECETAS, RECETAS_CINE, RECETAS_ACTUALIDAD, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
   INGREDIENTES_WEB, CATEGORIAS_RECETA, validarRecetaComunidad, puedeBorrarReceta,
 } from "./logica";
 
@@ -68,6 +68,7 @@ const btnSecundario = { ...btnBase, background: "#FFFFFF", color: C.text };
 const HERO_IMG = U("1504674900247-0877df9cc836");
 const BANNER_DIETA = U("1490645935967-10de6ba17061");
 const BANNER_CINE = U("1489599849927-2ee91cede3ba"); // butacas de cine; si falla, onImgError pone el degradado de marca
+const BANNER_ACTUALIDAD = U("1495020689067-958852a7765e"); // periódicos, cabecera de la sección de actualidad
 const BANNER_RECETARIO = U("1466637574441-749b8f19452f"); // mesa con ingredientes, cabecera del recetario
 const BANNER_RESTAURANTES = U("1517248135467-4c7edcad34c4"); // interior de restaurante, cabecera de la sección de restaurantes
 
@@ -121,7 +122,7 @@ export default function App() {
   // Secciones de catálogo (recetario y cine): recuerdan desde qué pantalla se
   // abrieron para volver a ella; saltar de una sección a otra no pisa ese origen.
   const [seccionDesde, setSeccionDesde] = useState("hero");
-  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes";
+  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes" || f === "actualidad";
   const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
 
   return (
@@ -182,6 +183,7 @@ export default function App() {
       {fase === "scan" && <Scan onDone={() => setFase("plan")} />}
       {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "cine" && <Cine onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "actualidad" && <Actualidad onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "recetario" && <Recetario onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} onCrear={() => setFase("crear")} />}
       {fase === "crear" && <CrearReceta onVolver={() => setFase("recetario")} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "restaurantes" && <Restaurantes datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
@@ -319,7 +321,7 @@ function BotonCartel({ children, onClick, activo = false, variante = "chip", cla
 // izquierda, enlaces monoespaciados centrados (escritorio), acciones
 // contextuales a la derecha y un botón "Menú" en pantallas estrechas.
 // `onInicio` hace clicable el logo; `actual` resalta la sección activa.
-const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"], ["restaurantes", "Restaurantes"]];
+const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"], ["actualidad", "Actualidad"], ["restaurantes", "Restaurantes"]];
 function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const irARutina = useContext(RutinaCtx);
@@ -1013,9 +1015,44 @@ function Cine({ onBack, onLogin, onIrSeccion }) {
   );
 }
 
-// Recetario completo: todas las recetas de la app (plan + cine) con buscador
-// por nombre o ingrediente y filtro por categoría.
-const CATS_RECETARIO = [["todas", "Todas"], ["desayuno", "Desayunos"], ["comida", "Comidas"], ["cena", "Cenas"], ["snack", "Snacks"], ["cine", "🎬 De cine"], ["comunidad", "👥 Comunidad"]];
+// Icono por tema de la noticia, para la etiqueta de cada plato de actualidad.
+const ICONO_ACTUALIDAD = { deporte: "🏆", cultura: "🎭", efemeride: "📅", mundo: "🌍" };
+const nombreTemaActualidad = (c) => ({ deporte: "Deporte", cultura: "Cultura", efemeride: "Efeméride", mundo: "Mundo" }[c] || "Actualidad");
+
+// Adapta una receta de actualidad al modelo unificado que consume FichaReceta.
+const fichaDeActualidad = (r) => ({
+  id: r.id, nombre: r.plato, img: r.img, escena: r.escena, fotoEscena: r.fotoEscena, fotoPlato: r.fotoPlato,
+  etiqueta: `${ICONO_ACTUALIDAD[r.categoria] || "📰"} ${nombreTemaActualidad(r.categoria)} · ${r.titular}`,
+  ingredientes: r.ingredientes, pasos: r.pasos, youtube: youtubeUrl(r.plato),
+});
+
+// Sección "Cocina de actualidad": cada semana una tarea programada añade un
+// plato inspirado en una noticia real. Independiente del plan semanal y el PDF.
+function Actualidad({ onBack, onLogin, onIrSeccion }) {
+  const [abierta, setAbierta] = useState<string | null>(null);
+  // Más recientes primero, por fecha de la noticia.
+  const lista = [...RECETAS_ACTUALIDAD].sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  return (
+    <div>
+      <CabeceraSeccion banner={BANNER_ACTUALIDAD} kicker="Fuera del plan · Al ritmo de la actualidad" titulo={<>Cocina de <span style={gradText}>actualidad</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="actualidad" />
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 80px" }}>
+        <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Platos inspirados en lo que pasa en el mundo: cada semana sumamos una receta ligada a una noticia de deporte, cultura o efemérides. Son un capricho: no cuentan para tu plan semanal ni salen en el PDF.</p>
+        <div style={{ display: "grid", gap: 14 }}>
+          {lista.map((r, i) => (
+            <Aparece key={r.id} delay={Math.min(i, 6) * 60} rot={i % 2 ? 1.4 : -1.4}>
+              <FichaReceta r={fichaDeActualidad(r)} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} />
+            </Aparece>
+          ))}
+        </div>
+        <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>📰 Recetas al hilo de la actualidad: se renuevan solas cada semana. Tu plan semanal sigue intacto.</div>
+      </div>
+    </div>
+  );
+}
+
+// Recetario completo: todas las recetas de la app (plan + cine + actualidad) con
+// buscador por nombre o ingrediente y filtro por categoría.
+const CATS_RECETARIO = [["todas", "Todas"], ["desayuno", "Desayunos"], ["comida", "Comidas"], ["cena", "Cenas"], ["snack", "Snacks"], ["cine", "🎬 De cine"], ["actualidad", "📰 Actualidad"], ["comunidad", "👥 Comunidad"]];
 const NOMBRE_CAT = { desayuno: "Desayuno", comida: "Comida", cena: "Cena", snack: "Snack" };
 
 function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
@@ -1044,6 +1081,7 @@ function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
     })),
     ...RECETAS.map((r) => ({ id: r.id, nombre: r.nombre, img: r.img, categoria: r.categoria, kcal: r.kcalAprox, etiqueta: NOMBRE_CAT[r.categoria], ingredientes: r.ingredientes, pasos: r.pasos, youtube: youtubeUrl(r.nombre) })),
     ...RECETAS_CINE.map((r) => ({ ...fichaDeCine(r), categoria: "cine" })),
+    ...RECETAS_ACTUALIDAD.map((r) => ({ ...fichaDeActualidad(r), categoria: "actualidad" })),
   ], [comunidad]);
   const q = normalizar(busqueda.trim());
   const lista = todas.filter((r) => (cat === "todas" || r.categoria === cat)

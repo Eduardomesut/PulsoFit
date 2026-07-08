@@ -434,6 +434,27 @@ export const RECETAS_CINE = [
   },
 ];
 
+// Recetas inspiradas en la actualidad. Sección independiente ("actualidad"):
+// una tarea programada semanal añade aquí un plato ligado a una noticia real
+// (deporte, cultura, efemérides...). Igual que la de cine, NO participa en el
+// plan semanal ni en el PDF (buildDiet/descargarPDF solo usan RECETAS).
+// - categoria: tema de la noticia ("deporte" | "cultura" | "efemeride" | "mundo").
+// - titular: la noticia que inspira el plato; fecha: día de la noticia (ISO).
+// - fuente: enlace a la noticia (opcional).
+// - fotoEscena / fotoPlato: imágenes reales opcionales; si faltan o fallan al
+//   cargar se cae a la foto de FOODIMG según `img`.
+export const RECETAS_ACTUALIDAD = [
+  {
+    id: "wimbledon2026Fresas", categoria: "deporte", titular: "Wimbledon 2026 entra en su semana decisiva en Londres", fecha: "2026-07-08",
+    plato: "Fresas con nata de Wimbledon", img: "fruta",
+    fuente: "https://en.wikipedia.org/wiki/2026_Wimbledon_Championships",
+    fotoPlato: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Strawberries_and_cream_%28Wimbledon%29.jpg/960px-Strawberries_and_cream_%28Wimbledon%29.jpg",
+    escena: "El bocado más icónico del tenis: mientras se juegan las semifinales en el All England Club, las gradas se llenan de cuencos de fresas con nata, la tradición inglesa que acompaña a Wimbledon desde hace más de un siglo.",
+    ingredientes: [{ nombre: "Fresas frescas", cantidad: "250 g" }, { nombre: "Nata para montar (35% m.g.)", cantidad: "150 ml" }, { nombre: "Azúcar glas", cantidad: "1 cucharada" }, { nombre: "Vainilla", cantidad: "unas gotas" }],
+    pasos: ["Lava las fresas, retírales el rabito y córtalas por la mitad.", "Espolvoréalas con media cucharada de azúcar y déjalas macerar 10 minutos para que suelten su jugo.", "Monta la nata bien fría con el resto del azúcar y la vainilla hasta que forme picos suaves.", "Reparte las fresas en cuencos y corona con la nata montada.", "Sírvelas al momento, como en las gradas del All England Club."],
+  },
+];
+
 export const SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 // Franjas de comida según el nº de comidas al día, con reparto calórico orientativo.
