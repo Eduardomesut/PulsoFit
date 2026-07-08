@@ -445,6 +445,14 @@ export const RECETAS_CINE = [
 //   cargar se cae a la foto de FOODIMG según `img`.
 export const RECETAS_ACTUALIDAD = [
   {
+    id: "sanfermin2026Pochas", categoria: "efemeride", titular: "Comienza en Pamplona la semana grande de los Sanfermines 2026, con el chupinazo y los encierros diarios", fecha: "2026-07-06",
+    plato: "Pochas a la Navarra", img: "legumbre",
+    fuente: "https://es.wikipedia.org/wiki/Sanfermines",
+    escena: "Tras el chupinazo del 6 de julio, Pamplona se llena de pañuelicos rojos, charangas y encierros al amanecer. Y cuando el bullicio da una tregua, en cualquier casa o peña navarra hierve la olla de pochas, el guiso de alubia blanca fresca que es la comida reina de estas fiestas.",
+    ingredientes: [{ nombre: "Alubia blanca fresca (pocha)", cantidad: "500 g" }, { nombre: "Chorizo", cantidad: "150 g" }, { nombre: "Panceta", cantidad: "100 g" }, { nombre: "Pimiento verde y cebolla", cantidad: "1 de cada" }, { nombre: "Tomate maduro", cantidad: "1 unidad" }, { nombre: "Ajo y laurel", cantidad: "2 dientes y 1 hoja" }],
+    pasos: ["Rehoga en aceite la cebolla, el pimiento y el ajo picados hasta que estén tiernos.", "Añade el tomate rallado y sofríe unos minutos más.", "Incorpora las pochas, el chorizo, la panceta y el laurel, y cubre con agua fría.", "Cocina a fuego suave, sin tapar del todo, 'asustando' el guiso con un chorro de agua fría un par de veces para que no se rompa la piel de la alubia.", "Deja reposar 10 minutos antes de servir bien caliente, como se come en cualquier peña durante los Sanfermines."],
+  },
+  {
     id: "wimbledon2026Fresas", categoria: "deporte", titular: "Wimbledon 2026 entra en su semana decisiva en Londres", fecha: "2026-07-08",
     plato: "Fresas con nata de Wimbledon", img: "fruta",
     fuente: "https://en.wikipedia.org/wiki/2026_Wimbledon_Championships",
