@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import {
   U, youtubeUrl, normalizar, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS,
   RECETAS, RECETAS_CINE, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
+  INGREDIENTES_WEB, CATEGORIAS_RECETA, validarRecetaComunidad, puedeBorrarReceta,
 } from "./logica";
 
 /* ============================================================
@@ -120,7 +121,8 @@ export default function App() {
       {fase === "scan" && <Scan onDone={() => setFase("plan")} />}
       {fase === "plan" && <Plan datos={datos} onReset={() => { setPaso(0); setDatos((d) => ({ ...d, objetivo: null, sexo: null })); setFase("hero"); }} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "cine" && <Cine onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
-      {fase === "recetario" && <Recetario onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "recetario" && <Recetario onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} onCrear={() => setFase("crear")} />}
+      {fase === "crear" && <CrearReceta onVolver={() => setFase("recetario")} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "restaurantes" && <Restaurantes datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
@@ -705,7 +707,7 @@ function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion,
 // Ficha expandible de receta, compartida por el recetario y la sección de cine.
 // `r` es un modelo unificado: etiqueta pequeña, nombre, kcal y fotos opcionales
 // (escena de la obra y plato real) más el detalle (ingredientes, pasos, youtube).
-function FichaReceta({ r, abierto, onToggle, delay = 0 }) {
+function FichaReceta({ r, abierto, onToggle, delay = 0, onBorrar }: any) {
   const generica = U(FOODIMG[r.img] || FOODIMG.otro, 600);
   const thumb = r.fotoEscena || r.fotoPlato || generica;
   const plato = r.fotoPlato || generica;
@@ -748,6 +750,11 @@ function FichaReceta({ r, abierto, onToggle, delay = 0 }) {
             <img src={plato} alt={r.nombre} loading="lazy" onError={conRespaldo} style={{ width: "100%", borderRadius: 14, aspectRatio: "1/1", objectFit: "cover", border: `1px solid ${C.line}` }} />
             <DetalleReceta ingredientes={r.ingredientes} pasos={r.pasos} youtube={r.youtube} />
           </div>
+          {onBorrar && (
+            <button onClick={onBorrar} style={{ marginTop: 16, background: "rgba(200,30,30,.08)", border: "1.5px solid rgba(200,30,30,.35)", color: "#B42318", borderRadius: 980, padding: "9px 20px", fontWeight: 600, fontSize: 13.5 }}>
+              🗑 Borrar esta receta
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -790,17 +797,36 @@ function Cine({ onBack, onLogin, onIrSeccion }) {
 
 // Recetario completo: todas las recetas de la app (plan + cine) con buscador
 // por nombre o ingrediente y filtro por categoría.
-const CATS_RECETARIO = [["todas", "Todas"], ["desayuno", "Desayunos"], ["comida", "Comidas"], ["cena", "Cenas"], ["snack", "Snacks"], ["cine", "🎬 De cine"]];
+const CATS_RECETARIO = [["todas", "Todas"], ["desayuno", "Desayunos"], ["comida", "Comidas"], ["cena", "Cenas"], ["snack", "Snacks"], ["cine", "🎬 De cine"], ["comunidad", "👥 Comunidad"]];
 const NOMBRE_CAT = { desayuno: "Desayuno", comida: "Comida", cena: "Cena", snack: "Snack" };
 
-function Recetario({ onBack, onLogin, onIrSeccion }) {
+function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
+  const { user, enabled } = useAuth();
   const [busqueda, setBusqueda] = useState("");
   const [cat, setCat] = useState("todas");
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Recetas publicadas por la comunidad (tabla recetas_comunidad). En modo
+  // invitado sin Supabase la lista queda vacía y la sección funciona igual.
+  const [comunidad, setComunidad] = useState<any[]>([]);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.from("recetas_comunidad").select("id, user_id, autor, receta").order("creado_en", { ascending: false })
+      .then(({ data }) => setComunidad(data ?? []));
+  }, []);
+  const borrarComunidad = async (id) => {
+    if (!supabase || !window.confirm("¿Seguro que quieres borrar esta receta? No se puede deshacer.")) return;
+    const { error } = await supabase.from("recetas_comunidad").delete().eq("id", id);
+    if (!error) setComunidad((c) => c.filter((r) => r.id !== id));
+  };
   const todas = useMemo(() => [
+    ...comunidad.map((row) => ({
+      id: row.id, user_id: row.user_id, nombre: row.receta.nombre, img: row.receta.img, categoria: "comunidad",
+      kcal: row.receta.kcalAprox, etiqueta: `👥 Comunidad · ${row.autor}`,
+      ingredientes: row.receta.ingredientes, pasos: row.receta.pasos, youtube: youtubeUrl(row.receta.nombre),
+    })),
     ...RECETAS.map((r) => ({ id: r.id, nombre: r.nombre, img: r.img, categoria: r.categoria, kcal: r.kcalAprox, etiqueta: NOMBRE_CAT[r.categoria], ingredientes: r.ingredientes, pasos: r.pasos, youtube: youtubeUrl(r.nombre) })),
     ...RECETAS_CINE.map((r) => ({ ...fichaDeCine(r), categoria: "cine" })),
-  ], []);
+  ], [comunidad]);
   const q = normalizar(busqueda.trim());
   const lista = todas.filter((r) => (cat === "todas" || r.categoria === cat)
     && (!q || normalizar(r.nombre).includes(q) || r.ingredientes.some((ing) => normalizar(ing.nombre).includes(q))));
@@ -809,6 +835,17 @@ function Recetario({ onBack, onLogin, onIrSeccion }) {
       <CabeceraSeccion banner={BANNER_RECETARIO} kicker={`${todas.length} recetas · Todas con foto y elaboración`} titulo={<>El <span style={gradText}>recetario</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="recetario" />
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 80px" }}>
         <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>Todas las recetas de PULSO en un solo sitio. Búscalas por nombre o por ingrediente y ábrelas para ver sus cantidades y su elaboración paso a paso.</p>
+        {enabled && (
+          <div className="fadeUp" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: "14px 18px", marginBottom: 20 }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ ...DF, fontWeight: 800, fontSize: 16 }}>¿Tienes un plato propio?</div>
+              <div style={{ color: C.dim, fontSize: 13.5, marginTop: 2 }}>{user ? "Publícalo con los ingredientes de nuestra despensa y compártelo con la comunidad." : "Inicia sesión para crear tu receta y publicarla en la comunidad."}</div>
+            </div>
+            <button className="btn-cta" onClick={user ? onCrear : onLogin} style={{ ...btnPrimario, minWidth: 0, padding: "11px 24px", flexShrink: 0 }}>
+              {user ? "+ Crear mi receta" : "Iniciar sesión"}
+            </button>
+          </div>
+        )}
         <div className="fadeUp" style={{ position: "relative", marginBottom: 16 }}>
           <span style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", fontSize: 16, pointerEvents: "none" }}>🔍</span>
           <input value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setAbierta(null); }} placeholder="Busca por nombre o ingrediente: salmón, avena, sándwich…" aria-label="Buscar receta" style={{ width: "100%", boxSizing: "border-box", padding: "16px 20px 16px 50px", borderRadius: 999, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
@@ -829,10 +866,128 @@ function Recetario({ onBack, onLogin, onIrSeccion }) {
         ) : (
           <div style={{ display: "grid", gap: 14 }}>
             {lista.map((r, i) => (
-              <FichaReceta key={r.id} r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={Math.min(i, 8) * 45} />
+              <FichaReceta key={r.id} r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={Math.min(i, 8) * 45}
+                onBorrar={r.categoria === "comunidad" && puedeBorrarReceta(user, r) ? () => borrarComunidad(r.id) : undefined} />
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* Pantalla "Crea tu receta": formulario para publicar una receta de la
+   comunidad. Los ingredientes se eligen de la despensa de la web
+   (INGREDIENTES_WEB) y la receta se guarda en la tabla recetas_comunidad,
+   de donde el Recetario la lee para todo el mundo. */
+const NOMBRES_FOODIMG = { pescado: "Pescado", pollo: "Pollo", carne: "Carne", huevo: "Huevo", avena: "Avena", yogur: "Yogur", ensalada: "Ensalada", arroz: "Arroz", pasta: "Pasta", legumbre: "Legumbre", tostada: "Tostada", batido: "Batido", fruta: "Fruta", patata: "Patata", verdura: "Verdura", otro: "Otro" };
+
+function CrearReceta({ onVolver, onLogin, onIrSeccion }) {
+  const { user } = useAuth();
+  const [nombre, setNombre] = useState("");
+  const [categoria, setCategoria] = useState("comida");
+  const [img, setImg] = useState("otro");
+  const [kcal, setKcal] = useState("");
+  const [ingredientes, setIngredientes] = useState<{ nombre: string; cantidad: string }[]>([]);
+  const [pasos, setPasos] = useState(["", ""]);
+  const [buscaIng, setBuscaIng] = useState("");
+  const [errores, setErrores] = useState<string[]>([]);
+  const [publicando, setPublicando] = useState(false);
+
+  const q = normalizar(buscaIng.trim());
+  const despensa = INGREDIENTES_WEB.filter((n) => !ingredientes.some((i) => i.nombre === n) && (!q || normalizar(n).includes(q)));
+
+  const anadirIngrediente = (n) => { setIngredientes((l) => [...l, { nombre: n, cantidad: "" }]); setBuscaIng(""); };
+  const setCantidad = (idx, v) => setIngredientes((l) => l.map((i, j) => (j === idx ? { ...i, cantidad: v } : i)));
+  const quitarIngrediente = (idx) => setIngredientes((l) => l.filter((_, j) => j !== idx));
+  const setPaso = (idx, v) => setPasos((l) => l.map((p, j) => (j === idx ? v : p)));
+
+  const publicar = async () => {
+    const borrador = { nombre: nombre.trim(), categoria, img, kcalAprox: Number(kcal), ingredientes, pasos: pasos.map((p) => p.trim()).filter(Boolean) };
+    const errs = validarRecetaComunidad(borrador);
+    if (!user) errs.push("Necesitas iniciar sesión para publicar tu receta.");
+    setErrores(errs);
+    if (errs.length || !supabase || !user) return;
+    setPublicando(true);
+    // El autor se muestra en la ficha pública: la parte local del correo, sin dominio.
+    const autor = (user.email ?? "").split("@")[0] || "usuario";
+    const { error } = await supabase.from("recetas_comunidad").insert({ user_id: user.id, autor, receta: borrador });
+    setPublicando(false);
+    if (error) { setErrores(["No se pudo publicar la receta. Vuelve a intentarlo en un momento."]); return; }
+    onVolver();
+  };
+
+  const etiqueta = { fontSize: 12, color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase" as const, margin: "24px 0 10px" };
+  const inputBase = { boxSizing: "border-box" as const, padding: "13px 16px", borderRadius: 14, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15, width: "100%" };
+  const chip = (activo) => ({ flexShrink: 0, padding: "9px 16px", borderRadius: 999, fontWeight: 700, fontSize: 13.5, border: `1.5px solid ${activo ? C.hot1 : C.line}`, color: activo ? "#0A0B0D" : C.dim, ...(activo ? grad : { background: C.panel }) });
+
+  return (
+    <div>
+      <CabeceraSeccion banner={BANNER_RECETARIO} kicker="Comunidad · Comparte tu plato" titulo={<>Crea tu <span style={gradText}>receta</span></>} onBack={onVolver} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="recetario" />
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 18px 80px" }}>
+        <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: 0, maxWidth: 640 }}>Elige los ingredientes de la despensa de PULSO, cuenta cómo se prepara y publícala: aparecerá en el recetario para toda la comunidad.</p>
+
+        <div style={etiqueta}>Nombre del plato</div>
+        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Bol de arroz con verduras al curry" style={inputBase} />
+
+        <div style={etiqueta}>Categoría</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {CATEGORIAS_RECETA.map((c) => (
+            <button key={c} onClick={() => setCategoria(c)} style={chip(categoria === c)}>{NOMBRE_CAT[c]}</button>
+          ))}
+        </div>
+
+        <div style={etiqueta}>Tipo de plato (elige la foto)</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {Object.keys(FOODIMG).map((k) => (
+            <button key={k} onClick={() => setImg(k)} style={chip(img === k)}>{NOMBRES_FOODIMG[k] ?? k}</button>
+          ))}
+        </div>
+
+        <div style={etiqueta}>Kcal aproximadas por ración</div>
+        <input type="number" min={50} max={2000} value={kcal} onChange={(e) => setKcal(e.target.value)} placeholder="400" style={{ ...inputBase, maxWidth: 180 }} />
+
+        <div style={etiqueta}>Ingredientes {ingredientes.length > 0 && `· ${ingredientes.length} elegidos`}</div>
+        {ingredientes.length > 0 && (
+          <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+            {ingredientes.map((ing, idx) => (
+              <div key={ing.nombre} style={{ display: "flex", alignItems: "center", gap: 10, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: "8px 8px 8px 16px" }}>
+                <div style={{ flex: 1, fontSize: 14.5, minWidth: 0 }}>{ing.nombre}</div>
+                <input value={ing.cantidad} onChange={(e) => setCantidad(idx, e.target.value)} placeholder="Cantidad: 150 g, 1 unidad…" aria-label={`Cantidad de ${ing.nombre}`} style={{ ...inputBase, width: 190, padding: "9px 12px", background: C.bg, fontSize: 13.5 }} />
+                <button onClick={() => quitarIngrediente(idx)} aria-label={`Quitar ${ing.nombre}`} style={{ background: "none", border: "none", color: C.dim, fontSize: 17, padding: "4px 10px" }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input value={buscaIng} onChange={(e) => setBuscaIng(e.target.value)} placeholder="🔍 Busca en la despensa: avena, salmón, tomate…" aria-label="Buscar ingrediente" style={inputBase} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, maxHeight: 190, overflowY: "auto", padding: 2 }}>
+          {despensa.map((n) => (
+            <button key={n} onClick={() => anadirIngrediente(n)} style={{ ...chip(false), padding: "7px 13px", fontWeight: 600 }}>+ {n}</button>
+          ))}
+          {despensa.length === 0 && <div style={{ color: C.dim, fontSize: 13.5, padding: "6px 2px" }}>No hay más ingredientes con esa búsqueda.</div>}
+        </div>
+
+        <div style={etiqueta}>Elaboración paso a paso</div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {pasos.map((p, idx) => (
+            <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ ...DF, ...gradText, fontWeight: 800, fontSize: 15, flexShrink: 0, minWidth: 18, textAlign: "right" }}>{idx + 1}</span>
+              <input value={p} onChange={(e) => setPaso(idx, e.target.value)} placeholder={idx === 0 ? "Ej. Cuece el arroz 12 minutos y resérvalo." : "Siguiente paso…"} aria-label={`Paso ${idx + 1}`} style={inputBase} />
+              {pasos.length > 2 && <button onClick={() => setPasos((l) => l.filter((_, j) => j !== idx))} aria-label={`Quitar paso ${idx + 1}`} style={{ background: "none", border: "none", color: C.dim, fontSize: 17, padding: "4px 6px" }}>✕</button>}
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setPasos((l) => [...l, ""])} style={{ marginTop: 10, background: "rgba(29,29,31,.06)", border: "none", borderRadius: 980, padding: "9px 18px", fontWeight: 600, fontSize: 13.5, color: C.text }}>+ Añadir paso</button>
+
+        {errores.length > 0 && (
+          <div style={{ marginTop: 22, background: "rgba(200,30,30,.06)", border: "1.5px solid rgba(200,30,30,.3)", borderRadius: 16, padding: "14px 18px" }}>
+            {errores.map((e) => <div key={e} style={{ color: "#B42318", fontSize: 14, lineHeight: 1.7 }}>· {e}</div>)}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
+          <button className="btn-cta" onClick={publicar} disabled={publicando} style={{ ...btnPrimario, opacity: publicando ? 0.6 : 1 }}>{publicando ? "Publicando…" : "Publicar receta"}</button>
+          <button className="btn-cta" onClick={onVolver} style={btnSecundario}>Cancelar</button>
+        </div>
       </div>
     </div>
   );

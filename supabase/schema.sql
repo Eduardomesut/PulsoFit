@@ -65,6 +65,43 @@ create policy "planes_propios" on public.planes
 -- sin esto el guardado del plan falla siempre con 42501 y la tabla queda vacía).
 grant select, insert, update, delete on public.planes to authenticated;
 
+-- ---------- Recetas de la comunidad ----------
+-- Recetas creadas por los usuarios desde la web. La columna `receta` guarda
+-- el mismo formato jsonb que las recetas del catálogo (nombre, categoria,
+-- img, kcalAprox, ingredientes[], pasos[]).
+create table if not exists public.recetas_comunidad (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  autor text not null,
+  receta jsonb not null,
+  creado_en timestamptz not null default now()
+);
+
+alter table public.recetas_comunidad enable row level security;
+
+-- Las recetas publicadas son públicas: las ve todo el mundo, también sin sesión.
+drop policy if exists "recetas_comunidad_leer_todos" on public.recetas_comunidad;
+create policy "recetas_comunidad_leer_todos" on public.recetas_comunidad
+  for select using (true);
+
+-- Publicar requiere sesión y solo en nombre propio.
+drop policy if exists "recetas_comunidad_publicar_propia" on public.recetas_comunidad;
+create policy "recetas_comunidad_publicar_propia" on public.recetas_comunidad
+  for insert with check (auth.uid() = user_id);
+
+-- Borrar: el autor puede borrar las suyas; el administrador (este correo,
+-- el mismo que ADMIN_EMAIL en src/logica.ts) puede borrar cualquiera.
+drop policy if exists "recetas_comunidad_borrar" on public.recetas_comunidad;
+create policy "recetas_comunidad_borrar" on public.recetas_comunidad
+  for delete using (
+    auth.uid() = user_id
+    or (auth.jwt() ->> 'email') = 'merinofernandezeduardo@gmail.com'
+  );
+
+-- Permisos de tabla (imprescindibles además de la RLS, ver nota en perfiles).
+grant select on public.recetas_comunidad to anon, authenticated;
+grant select, insert, delete on public.recetas_comunidad to authenticated;
+
 -- ============================================================
 -- Las Fases 2 (progreso) y 3 (amigos) añadirán las tablas
 -- `registros` y `amistades` aquí más adelante.
