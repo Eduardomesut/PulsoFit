@@ -111,6 +111,17 @@ export default function App() {
         @keyframes scanline { 0%{top:0%;} 100%{top:100%;} }
         @keyframes marquesina { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         .fadeUp { animation: fadeUp .6s ease both; }
+        /* Polaroids flotantes del hero: la capa exterior recibe el paralaje del
+           ratón (variables --px/--py) y la interior levita en bucle. Al pasar
+           el ratón por encima, la foto se endereza y crece un poco. */
+        @keyframes flotar { 0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); } 50% { transform: translateY(-13px) rotate(calc(var(--rot, 0deg) + 1.6deg)); } }
+        .polaroid { position: absolute; transform: translate(var(--px, 0px), var(--py, 0px)); transition: transform .45s cubic-bezier(.2,.8,.3,1); will-change: transform; z-index: 3; }
+        .polaroid:hover { z-index: 6; }
+        .polaroid-marco { animation: flotar var(--dur, 7s) ease-in-out infinite; background: #fff; border: 2px solid ${C.line}; border-radius: 10px; padding: 9px 9px 12px; box-shadow: 5px 6px 0 rgba(15,44,86,.85); transition: transform .3s cubic-bezier(.2,.8,.3,1.4); }
+        .polaroid:hover .polaroid-marco { animation-play-state: paused; transform: rotate(0deg) scale(1.07); }
+        @media (max-width: 1080px) { .polaroid { display: none; } }
+        @keyframes popIn { from { opacity: 0; transform: translateY(26px) rotate(-1.5deg) scale(.97); } to { opacity: 1; transform: none; } }
+        .popIn { animation: popIn .55s cubic-bezier(.2,.9,.3,1.15) both; }
         /* Microinteracciones retro: los botones-pegatina se "levantan" al pasar
            el ratón (la sombra dura crece) y se "aplastan" contra la página al
            pulsarlos (la sombra desaparece). Las tarjetas hacen lo mismo. */
@@ -293,14 +304,87 @@ function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
     <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 90 }}>
       <div className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderLeft: `2px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4, animation: "menuIn .28s ease both" }}>
         <button className="nav-item" onClick={onCerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
-        {onInicio && <button className="nav-item" onClick={ir(onInicio)} style={item}>Inicio</button>}
-        {irARutina && <button className={`nav-item${actual === "rutina" ? " activo" : ""}`} onClick={ir(irARutina)} style={item}>Mi rutina</button>}
-        {NAV_LINKS.map(([id, t]) => (
-          <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={item}>{t}</button>
+        {onInicio && <button className="nav-item fadeUp" onClick={ir(onInicio)} style={{ ...item, animationDelay: "60ms" }}>Inicio</button>}
+        {irARutina && <button className={`nav-item fadeUp${actual === "rutina" ? " activo" : ""}`} onClick={ir(irARutina)} style={{ ...item, animationDelay: "110ms" }}>Mi rutina</button>}
+        {NAV_LINKS.map(([id, t], i) => (
+          <button key={id} className={`nav-item fadeUp${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={{ ...item, animationDelay: `${160 + i * 55}ms` }}>{t}</button>
         ))}
         <div style={{ height: 1, background: C.line, margin: "10px 4px" }} />
         <CuentaChip onLogin={ir(onLogin)} vertical />
       </div>
+    </div>
+  );
+}
+
+/* Aparece: revela su contenido cuando entra en el viewport (IntersectionObserver),
+   con un pequeño salto y giro tipo pegatina. Sustituye al fadeUp de montaje en
+   las listas largas, para que cada tarjeta anime justo cuando se ve. */
+function Aparece({ children, delay = 0, rot = 0 }: any) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visto, setVisto] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") { setVisto(true); return; }
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisto(true); io.disconnect(); } }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} style={{ opacity: visto ? 1 : 0, transform: visto ? "none" : `translateY(30px) rotate(${rot}deg) scale(.98)`, transition: `opacity .55s ease ${delay}ms, transform .55s cubic-bezier(.2,.9,.3,1.15) ${delay}ms` }}>
+      {children}
+    </div>
+  );
+}
+
+/* Fotos flotantes del hero: polaroids giradas que levitan en bucle y se
+   apartan del ratón cuando pasa cerca (paralaje + repulsión), como las
+   fotos sueltas de la web de pizza-amici. Solo escritorio (>1080px). */
+const POLAROIDS = [
+  { img: "ensalada", texto: "sin remordimientos", pos: { top: "23%", left: "5%" }, rot: -7, deriva: 30, dur: 7.2 },
+  { img: "batido", texto: "listo en 10 min", pos: { top: "56%", left: "10%" }, rot: 5, deriva: 55, dur: 8.4 },
+  { img: "carne", texto: "alto en proteína", pos: { top: "21%", right: "6%" }, rot: 6, deriva: 42, dur: 7.8 },
+  { img: "fruta", texto: "tu semana, resuelta", pos: { top: "58%", right: "11%" }, rot: -5, deriva: 68, dur: 9 },
+];
+function FotosFlotantes() {
+  const capa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = capa.current;
+    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const onMove = (e: MouseEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const r = el.getBoundingClientRect();
+        el.querySelectorAll<HTMLElement>(".polaroid").forEach((foto, i) => {
+          const fr = foto.getBoundingClientRect();
+          const cx = fr.left + fr.width / 2, cy = fr.top + fr.height / 2;
+          // Deriva de profundidad: cada foto sigue al ratón a su propio ritmo…
+          const deriva = POLAROIDS[i]?.deriva ?? 40;
+          let px = (e.clientX - (r.left + r.width / 2)) / deriva;
+          let py = (e.clientY - (r.top + r.height / 2)) / deriva;
+          // …y repulsión de cercanía: si el ratón se acerca, la foto se aparta.
+          const dx = cx - e.clientX, dy = cy - e.clientY;
+          const dist = Math.hypot(dx, dy);
+          const fuerza = Math.max(0, 1 - dist / 300) * 46;
+          if (dist > 1) { px += (dx / dist) * fuerza; py += (dy / dist) * fuerza; }
+          foto.style.setProperty("--px", `${px.toFixed(1)}px`);
+          foto.style.setProperty("--py", `${py.toFixed(1)}px`);
+        });
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => { window.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
+  }, []);
+  return (
+    <div ref={capa} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
+      {POLAROIDS.map((p) => (
+        <div key={p.img} className="polaroid" style={{ ...p.pos, pointerEvents: "auto", ["--rot" as any]: `${p.rot}deg`, ["--dur" as any]: `${p.dur}s` }}>
+          <div className="polaroid-marco">
+            <img src={U(FOODIMG[p.img], 400)} alt="" onError={onImgError} style={{ width: 148, height: 148, objectFit: "cover", display: "block", borderRadius: 5 }} />
+            <div style={{ ...SERIF, fontSize: 16, color: C.text, textAlign: "center", marginTop: 7 }}>{p.texto}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -315,6 +399,7 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar, onIrSeccion }) {
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(15,44,86,.42) 0%, rgba(15,44,86,.22) 46%, rgba(242,237,233,.9) 82%, ${C.bg} 100%)` }} />
       </div>
       <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} />
+      <FotosFlotantes />
       <main className="fadeUp" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "17vh 24px 0" }}>
         {/* Insignia tipo ticket: tarjeta blanca con doble borde marino,
             ligeramente girada, como las pegatinas del food-truck. */}
@@ -746,7 +831,7 @@ function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion,
       <Cabecera onIrSeccion={onIrSeccion} onLogin={onLogin} actual={actual} acciones={
         <button className="nav-item" onClick={onBack}>« Volver</button>
       } />
-      <div className="fadeUp" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px", color: C.text }}>
+      <div className="popIn" style={{ position: "absolute", left: 0, right: 0, bottom: 26, maxWidth: 980, margin: "0 auto", padding: "0 18px", color: C.text }}>
         <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: C.hot1, fontWeight: 700 }}>{kicker}</div>
         <h1 style={{ ...DF, fontSize: "clamp(30px,6vw,54px)", fontWeight: 800, margin: "8px 0 0" }}>{titulo}</h1>
       </div>
@@ -757,7 +842,7 @@ function CabeceraSeccion({ banner, kicker, titulo, onBack, onLogin, onIrSeccion,
 // Ficha expandible de receta, compartida por el recetario y la sección de cine.
 // `r` es un modelo unificado: etiqueta pequeña, nombre, kcal y fotos opcionales
 // (escena de la obra y plato real) más el detalle (ingredientes, pasos, youtube).
-function FichaReceta({ r, abierto, onToggle, delay = 0, onBorrar }: any) {
+function FichaReceta({ r, abierto, onToggle, onBorrar }: any) {
   const generica = U(FOODIMG[r.img] || FOODIMG.otro, 600);
   const thumb = r.fotoEscena || r.fotoPlato || generica;
   const plato = r.fotoPlato || generica;
@@ -765,7 +850,7 @@ function FichaReceta({ r, abierto, onToggle, delay = 0, onBorrar }: any) {
   // y, si también falla, onImgError pinta el degradado de marca.
   const conRespaldo = (e) => { const t = e.currentTarget; if (t.src !== generica) t.src = generica; else onImgError(e); };
   return (
-    <div className="exwrap fadeUp" style={{ animationDelay: `${delay}ms`, background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
+    <div className="exwrap" style={{ background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
       <button onClick={onToggle} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
         <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
           <img className="eximg" src={thumb} alt={r.nombre} loading="lazy" onError={conRespaldo} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
@@ -836,7 +921,9 @@ function Cine({ onBack, onLogin, onIrSeccion }) {
         </div>
         <div style={{ display: "grid", gap: 14 }}>
           {lista.map((r, i) => (
-            <FichaReceta key={r.id} r={fichaDeCine(r)} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={i * 55} />
+            <Aparece key={r.id} delay={Math.min(i, 6) * 60} rot={i % 2 ? 1.4 : -1.4}>
+              <FichaReceta r={fichaDeCine(r)} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} />
+            </Aparece>
           ))}
         </div>
         <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>🍿 Estos platos son homenajes a sus series y películas: disfrútalos de vez en cuando, sin remordimientos. Tu plan semanal sigue intacto.</div>
@@ -916,8 +1003,10 @@ function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
         ) : (
           <div style={{ display: "grid", gap: 14 }}>
             {lista.map((r, i) => (
-              <FichaReceta key={r.id} r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} delay={Math.min(i, 8) * 45}
-                onBorrar={r.categoria === "comunidad" && puedeBorrarReceta(user, r) ? () => borrarComunidad(r.id) : undefined} />
+              <Aparece key={r.id} delay={Math.min(i, 6) * 55} rot={i % 2 ? 1.4 : -1.4}>
+                <FichaReceta r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)}
+                  onBorrar={r.categoria === "comunidad" && puedeBorrarReceta(user, r) ? () => borrarComunidad(r.id) : undefined} />
+              </Aparece>
             ))}
           </div>
         )}
