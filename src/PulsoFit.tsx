@@ -175,7 +175,6 @@ export default function App() {
         .marquesina span { font-family: ${MONO}; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; padding: 7px 0; }
         @media (max-width: 900px) { .nav-escritorio { display: none !important; } }
         @media (min-width: 901px) { .nav-movil { display: none !important; } }
-        @keyframes menuIn { from { transform: translateX(100%); } to { transform: none; } }
         @media (max-width: 600px) { .cta-fila { flex-direction: column; align-items: stretch; } }
       `}</style>
       {fase === "hero" && <Hero onStart={() => setFase("form")} onLogin={() => setAuthAbierto(true)} planGuardado={planGuardado} onRetomar={retomarPlan} onIrSeccion={irSeccion} />}
@@ -318,23 +317,46 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   );
 }
 
-// Panel lateral deslizante (menú móvil), estilo Tesla: lista vertical de
-// enlaces planos sobre un panel con blur que entra desde la derecha.
+// Panel lateral deslizante (menú móvil). La entrada y la salida las orquesta
+// una timeline de GSAP: el velo aparece, el panel entra desde la derecha y los
+// enlaces se revelan escalonados. Al cerrar se reproduce la timeline en
+// reversa y solo entonces se desmonta (por eso el cierre pasa por `cerrar`).
 function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
-  const ir = (fn) => () => { onCerrar(); fn(); };
   const irARutina = useContext(RutinaCtx);
+  const velo = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const tl = useRef<gsap.core.Timeline | null>(null);
+
+  useLayoutEffect(() => {
+    if (REDUCE) return; // sin animación: el panel se muestra tal cual
+    const ctx = gsap.context(() => {
+      const enlaces = panel.current!.querySelectorAll(".menu-enlace");
+      tl.current = gsap.timeline({ defaults: { ease: "power3.out" } })
+        .from(velo.current, { autoAlpha: 0, duration: 0.25 })
+        .from(panel.current, { xPercent: 100, duration: 0.4 }, "<")
+        .from(enlaces, { x: 24, autoAlpha: 0, stagger: 0.05, duration: 0.35 }, "-=0.15");
+    });
+    return () => ctx.revert();
+  }, []);
+
+  // Cierra con la animación en reversa; si no hay animación, cierra directo.
+  const cerrar = () => {
+    if (REDUCE || !tl.current) { onCerrar(); return; }
+    tl.current.eventCallback("onReverseComplete", onCerrar).timeScale(1.6).reverse();
+  };
+  const ir = (fn) => () => { fn(); cerrar(); };
   const item = { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" };
   return (
-    <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 90 }}>
-      <div className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderLeft: `2px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4, animation: "menuIn .28s ease both" }}>
-        <button className="nav-item" onClick={onCerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
-        {onInicio && <button className="nav-item fadeUp" onClick={ir(onInicio)} style={{ ...item, animationDelay: "60ms" }}>Inicio</button>}
-        {irARutina && <button className={`nav-item fadeUp${actual === "rutina" ? " activo" : ""}`} onClick={ir(irARutina)} style={{ ...item, animationDelay: "110ms" }}>Mi rutina</button>}
-        {NAV_LINKS.map(([id, t], i) => (
-          <button key={id} className={`nav-item fadeUp${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={{ ...item, animationDelay: `${160 + i * 55}ms` }}>{t}</button>
+    <div ref={velo} onClick={cerrar} style={{ position: "fixed", inset: 0, background: "rgba(15,44,86,.45)", zIndex: 90 }}>
+      <div ref={panel} className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.98)", borderLeft: `2px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
+        <button className="nav-item menu-enlace" onClick={cerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
+        {onInicio && <button className="nav-item menu-enlace" onClick={ir(onInicio)} style={item}>Inicio</button>}
+        {irARutina && <button className={`nav-item menu-enlace${actual === "rutina" ? " activo" : ""}`} onClick={ir(irARutina)} style={item}>Mi rutina</button>}
+        {NAV_LINKS.map(([id, t]) => (
+          <button key={id} className={`nav-item menu-enlace${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={item}>{t}</button>
         ))}
-        <div style={{ height: 1, background: C.line, margin: "10px 4px" }} />
-        <CuentaChip onLogin={ir(onLogin)} vertical />
+        <div className="menu-enlace" style={{ height: 1, background: C.line, margin: "10px 4px" }} />
+        <span className="menu-enlace"><CuentaChip onLogin={ir(onLogin)} vertical /></span>
       </div>
     </div>
   );
