@@ -281,6 +281,39 @@ function Marquesina({ texto }) {
   );
 }
 
+/* Enlace de menú con forma de cartel/pegatina que rebota con GSAP: al pasar el
+   ratón da un bote elástico (escala + giro leve + la sombra dura crece) y al
+   pulsarlo se aplasta y vuelve a botar. `variante` "chip" (barra de escritorio,
+   compacto) o "bloque" (menú móvil, ancho completo). El activo va en mostaza.
+   Con prefers-reduced-motion no anima, solo cambia la sombra. */
+function BotonCartel({ children, onClick, activo = false, variante = "chip", className = "", style }: any) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const grande = variante === "bloque";
+  const salta = () => {
+    if (REDUCE || !ref.current) return;
+    gsap.to(ref.current, { scale: grande ? 1.03 : 1.08, rotation: gsap.utils.random(-2.4, 2.4), y: -3, boxShadow: `6px 6px 0 ${C.line}`, duration: 0.55, ease: "elastic.out(1, 0.45)", overwrite: true });
+  };
+  const vuelve = () => {
+    if (REDUCE || !ref.current) return;
+    gsap.to(ref.current, { scale: 1, rotation: 0, y: 0, boxShadow: `3px 3px 0 ${C.line}`, duration: 0.3, ease: "power2.out", overwrite: true });
+  };
+  const aplasta = () => {
+    if (REDUCE || !ref.current) return;
+    gsap.fromTo(ref.current, { scale: 0.88, y: 1 }, { scale: grande ? 1.03 : 1.08, y: -3, duration: 0.5, ease: "elastic.out(1, 0.4)", overwrite: true });
+  };
+  return (
+    <button ref={ref} className={className} onClick={onClick} onMouseEnter={salta} onMouseLeave={vuelve} onPointerDown={aplasta}
+      style={{
+        background: activo ? C.hot2 : "#fff", border: `2px solid ${C.line}`, borderRadius: 10, boxShadow: `3px 3px 0 ${C.line}`,
+        color: C.text, fontFamily: MONO, fontWeight: 600, fontSize: grande ? 15 : 12, letterSpacing: "0.05em", textTransform: "uppercase",
+        padding: grande ? "13px 16px" : "8px 14px", transition: "none", whiteSpace: "nowrap",
+        ...(grande ? { width: "100%", textAlign: "left" as const } : {}), ...style,
+      }}>
+      {children}
+    </button>
+  );
+}
+
 // Cabecera compartida por todas las pantallas, estilo food-truck retro:
 // marquesina marina arriba y barra blanca tipo pegatina con el logo a la
 // izquierda, enlaces monoespaciados centrados (escritorio), acciones
@@ -298,10 +331,10 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
         {onInicio
           ? <button className="nav-item" onClick={onInicio} aria-label="Ir al inicio" style={{ padding: "4px 10px" }}>{logo}</button>
           : <div style={{ padding: "4px 10px" }}>{logo}</div>}
-        <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 2 }}>
-          {irARutina && <button className={`nav-item${actual === "rutina" ? " activo" : ""}`} onClick={irARutina}>Mi rutina</button>}
+        <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8 }}>
+          {irARutina && <BotonCartel activo={actual === "rutina"} onClick={irARutina}>Mi rutina</BotonCartel>}
           {NAV_LINKS.map(([id, t]) => (
-            <button key={id} className={`nav-item${actual === id ? " activo" : ""}`} onClick={() => onIrSeccion(id)}>{t}</button>
+            <BotonCartel key={id} activo={actual === id} onClick={() => onIrSeccion(id)}>{t}</BotonCartel>
           ))}
         </nav>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
@@ -345,15 +378,14 @@ function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
     tl.current.eventCallback("onReverseComplete", onCerrar).timeScale(1.6).reverse();
   };
   const ir = (fn) => () => { fn(); cerrar(); };
-  const item = { width: "100%", textAlign: "left" as const, fontSize: 15, padding: "12px 14px" };
   return (
     <div ref={velo} onClick={cerrar} style={{ position: "fixed", inset: 0, background: "rgba(15,44,86,.45)", zIndex: 90 }}>
       <div ref={panel} className="sobre-claro" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(320px, 85vw)", background: "rgba(255,255,255,.98)", borderLeft: `2px solid ${C.line}`, color: C.text, padding: "18px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
         <button className="nav-item menu-enlace" onClick={cerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
-        {onInicio && <button className="nav-item menu-enlace" onClick={ir(onInicio)} style={item}>Inicio</button>}
-        {irARutina && <button className={`nav-item menu-enlace${actual === "rutina" ? " activo" : ""}`} onClick={ir(irARutina)} style={item}>Mi rutina</button>}
+        {onInicio && <BotonCartel className="menu-enlace" variante="bloque" onClick={ir(onInicio)}>Inicio</BotonCartel>}
+        {irARutina && <BotonCartel className="menu-enlace" variante="bloque" activo={actual === "rutina"} onClick={ir(irARutina)}>Mi rutina</BotonCartel>}
         {NAV_LINKS.map(([id, t]) => (
-          <button key={id} className={`nav-item menu-enlace${actual === id ? " activo" : ""}`} onClick={ir(() => onIrSeccion(id))} style={item}>{t}</button>
+          <BotonCartel key={id} className="menu-enlace" variante="bloque" activo={actual === id} onClick={ir(() => onIrSeccion(id))}>{t}</BotonCartel>
         ))}
         <div className="menu-enlace" style={{ height: 1, background: C.line, margin: "10px 4px" }} />
         <span className="menu-enlace"><CuentaChip onLogin={ir(onLogin)} vertical /></span>
