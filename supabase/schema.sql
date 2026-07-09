@@ -102,6 +102,29 @@ create policy "recetas_comunidad_borrar" on public.recetas_comunidad
 grant select on public.recetas_comunidad to anon, authenticated;
 grant select, insert, delete on public.recetas_comunidad to authenticated;
 
+-- ---------- Favoritos ----------
+-- Recetas que el usuario guarda con el corazón. `receta_id` es texto porque
+-- mezcla ids del catálogo estático ("des1", "cine3"…) y uuids de
+-- recetas_comunidad. Una fila por usuario y receta.
+create table if not exists public.favoritos (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  receta_id text not null,
+  creado_en timestamptz not null default now(),
+  primary key (user_id, receta_id)
+);
+
+alter table public.favoritos enable row level security;
+
+-- Cada usuario solo ve y toca sus propios favoritos.
+drop policy if exists "favoritos_propios" on public.favoritos;
+create policy "favoritos_propios" on public.favoritos
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Permisos de tabla (imprescindibles además de la RLS, ver nota en perfiles).
+-- update incluido: el corazón guarda con upsert (INSERT ... ON CONFLICT DO
+-- UPDATE), que exige ese privilegio además de insert.
+grant select, insert, update, delete on public.favoritos to authenticated;
+
 -- ============================================================
 -- Las Fases 2 (progreso) y 3 (amigos) añadirán las tablas
 -- `registros` y `amistades` aquí más adelante.
