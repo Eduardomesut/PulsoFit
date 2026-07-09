@@ -71,12 +71,19 @@ const BANNER_CINE = U("1489599849927-2ee91cede3ba"); // butacas de cine; si fall
 const BANNER_ACTUALIDAD = U("1495020689067-958852a7765e"); // periódicos, cabecera de la sección de actualidad
 const BANNER_RECETARIO = U("1466637574441-749b8f19452f"); // mesa con ingredientes, cabecera del recetario
 const BANNER_RESTAURANTES = U("1517248135467-4c7edcad34c4"); // interior de restaurante, cabecera de la sección de restaurantes
+const BANNER_FAVORITOS = U("1490474418585-ba9bad8fd0ea"); // frutas en corazón, cabecera de la sección de favoritos
 
 /* Enlace "Mi rutina" del menú: App lo rellena cuando hay sesión iniciada y un
    plan que enseñar (el de la sesión actual o el guardado en Supabase); null lo
    oculta. Va por contexto para que la cabecera lo lea desde cualquier pantalla
    sin arrastrar la prop por todas. */
 const RutinaCtx = createContext<null | (() => void)>(null);
+
+/* Favoritos del usuario: ids de receta guardados en la tabla `favoritos`.
+   App lo rellena solo con sesión iniciada; null (invitado o sin Supabase)
+   oculta los corazones de las fichas y el enlace del menú. Va por contexto
+   para que cualquier FichaReceta lo lea sin arrastrar props. */
+const FavoritosCtx = createContext<null | { ids: string[]; alternar: (id: string) => void }>(null);
 
 export default function App() {
   const [fase, setFase] = useState("hero");
@@ -109,6 +116,29 @@ export default function App() {
 
   const retomarPlan = () => { if (planGuardado) { setDatos(planGuardado); setFase("plan"); } };
 
+  // Favoritos del usuario (ids de receta). Se cargan al iniciar sesión y se
+  // actualizan en optimista: la interfaz cambia al momento y, si Supabase
+  // falla, se revierte. Sin sesión el contexto queda a null.
+  const [favoritos, setFavoritos] = useState<string[]>([]);
+  useEffect(() => {
+    if (!supabase || !user) { setFavoritos([]); return; }
+    supabase.from("favoritos").select("receta_id").eq("user_id", user.id)
+      .then(({ data }) => setFavoritos((data ?? []).map((f) => f.receta_id)));
+  }, [user]);
+  const ctxFavoritos = useMemo(() => {
+    if (!supabase || !user) return null;
+    const sb = supabase, uid = user.id;
+    const alternar = (id) => {
+      const quitar = favoritos.includes(id);
+      setFavoritos((l) => (quitar ? l.filter((x) => x !== id) : [...l, id]));
+      const op = quitar
+        ? sb.from("favoritos").delete().eq("user_id", uid).eq("receta_id", id)
+        : sb.from("favoritos").upsert({ user_id: uid, receta_id: id });
+      op.then(({ error }) => { if (error) setFavoritos((l) => (quitar ? [...l, id] : l.filter((x) => x !== id))); });
+    };
+    return { ids: favoritos, alternar };
+  }, [user, favoritos]);
+
   // "Mi rutina": con sesión iniciada y un plan disponible, el menú ofrece
   // volver a él desde cualquier pantalla. Prefiere el plan de la sesión en
   // curso; si no lo hay (p. ej. tras recargar en otra sección), el guardado.
@@ -122,11 +152,12 @@ export default function App() {
   // Secciones de catálogo (recetario y cine): recuerdan desde qué pantalla se
   // abrieron para volver a ella; saltar de una sección a otra no pisa ese origen.
   const [seccionDesde, setSeccionDesde] = useState("hero");
-  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes" || f === "actualidad";
+  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes" || f === "actualidad" || f === "favoritos";
   const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
 
   return (
     <RutinaCtx.Provider value={irARutina}>
+    <FavoritosCtx.Provider value={ctxFavoritos}>
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: MONO, fontSize: 14 }}>
       <style>{`
         @keyframes fadeUp { from { opacity:0; transform:translateY(26px);} to {opacity:1; transform:none;} }
@@ -187,8 +218,10 @@ export default function App() {
       {fase === "recetario" && <Recetario onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} onCrear={() => setFase("crear")} />}
       {fase === "crear" && <CrearReceta onVolver={() => setFase("recetario")} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "restaurantes" && <Restaurantes datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "favoritos" && <Favoritos onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
+    </FavoritosCtx.Provider>
     </RutinaCtx.Provider>
   );
 }
@@ -288,7 +321,7 @@ function Marquesina({ texto }) {
    pulsarlo se aplasta y vuelve a botar. `variante` "chip" (barra de escritorio,
    compacto) o "bloque" (menú móvil, ancho completo). El activo va en mostaza.
    Con prefers-reduced-motion no anima, solo cambia la sombra. */
-function BotonCartel({ children, onClick, activo = false, variante = "chip", className = "", style }: any) {
+function BotonCartel({ children, onClick, activo = false, variante = "chip", className = "", style, ...resto }: any) {
   const ref = useRef<HTMLButtonElement>(null);
   const grande = variante === "bloque";
   const salta = () => {
@@ -304,7 +337,7 @@ function BotonCartel({ children, onClick, activo = false, variante = "chip", cla
     gsap.fromTo(ref.current, { scale: 0.88, y: 1 }, { scale: grande ? 1.03 : 1.08, y: -3, duration: 0.5, ease: "elastic.out(1, 0.4)", overwrite: true });
   };
   return (
-    <button ref={ref} className={className} onClick={onClick} onMouseEnter={salta} onMouseLeave={vuelve} onPointerDown={aplasta}
+    <button ref={ref} className={className} onClick={onClick} onMouseEnter={salta} onMouseLeave={vuelve} onPointerDown={aplasta} {...resto}
       style={{
         background: activo ? C.hot2 : "#fff", border: `2px solid ${C.line}`, borderRadius: 10, boxShadow: `3px 3px 0 ${C.line}`,
         color: C.text, fontFamily: MONO, fontWeight: 600, fontSize: grande ? 15 : 12, letterSpacing: "0.05em", textTransform: "uppercase",
@@ -316,15 +349,68 @@ function BotonCartel({ children, onClick, activo = false, variante = "chip", cla
   );
 }
 
+/* Desplegable "Categorías" de la barra de escritorio: al pasar el ratón (o
+   pulsar el cartel, para táctil y teclado) se abre un panel-pegatina del que
+   caen los carteles escalonados con un bote elástico de GSAP; al salir, la
+   timeline se reproduce en reversa acelerada. El panel es hijo del propio
+   contenedor para que el ratón pueda bajar del cartel al panel sin cerrarlo.
+   Con prefers-reduced-motion se muestra y oculta sin animación. */
+function MenuCategorias({ actual, onIrSeccion, user }) {
+  const [abierto, setAbierto] = useState(false);
+  const panel = useRef<HTMLDivElement>(null);
+  const tl = useRef<gsap.core.Timeline | null>(null);
+  const enlaces = categoriasNav(user);
+  const dentro = enlaces.some(([id]) => id === actual);
+
+  useLayoutEffect(() => {
+    if (REDUCE) return;
+    const ctx = gsap.context(() => {
+      tl.current = gsap.timeline({ paused: true })
+        .fromTo(panel.current, { autoAlpha: 0, y: -10, scale: 0.94 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.22, ease: "power3.out" })
+        .fromTo(panel.current!.querySelectorAll(".cat-enlace"),
+          { y: -16, autoAlpha: 0, rotation: (i) => (i % 2 ? 3 : -3) },
+          { y: 0, autoAlpha: 1, rotation: 0, stagger: 0.06, duration: 0.55, ease: "elastic.out(1, 0.5)" }, "-=0.08");
+    });
+    return () => ctx.revert();
+  }, [user]); // con o sin sesión cambia la lista de carteles
+
+  useEffect(() => {
+    if (REDUCE || !tl.current) return;
+    if (abierto) tl.current.timeScale(1).play();
+    else tl.current.timeScale(2).reverse();
+  }, [abierto]);
+
+  return (
+    <div onMouseEnter={() => setAbierto(true)} onMouseLeave={() => setAbierto(false)} style={{ position: "relative" }}>
+      <BotonCartel activo={dentro} onClick={() => setAbierto((a) => !a)} aria-expanded={abierto} aria-haspopup="true">Categorías ▾</BotonCartel>
+      {/* paddingTop hace de puente para que el ratón no "caiga" entre cartel y panel */}
+      <div ref={panel} style={{ position: "absolute", top: "100%", left: "50%", marginLeft: -95, paddingTop: 10, zIndex: 30, ...(REDUCE ? { visibility: abierto ? "visible" as const : "hidden" as const, opacity: abierto ? 1 : 0 } : { visibility: "hidden" as const, opacity: 0 }) }}>
+        <div style={{ display: "grid", gap: 7, background: "#fff", border: `2px solid ${C.line}`, borderRadius: 12, boxShadow: `4px 4px 0 ${C.line}`, padding: 8, width: 190 }}>
+          {enlaces.map(([id, t]) => (
+            <BotonCartel key={id} className="cat-enlace" variante="bloque" activo={actual === id} onClick={() => { setAbierto(false); onIrSeccion(id); }} style={{ fontSize: 12.5, padding: "11px 14px" }}>{t}</BotonCartel>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Cabecera compartida por todas las pantallas, estilo food-truck retro:
 // marquesina marina arriba y barra blanca tipo pegatina con el logo a la
 // izquierda, enlaces monoespaciados centrados (escritorio), acciones
 // contextuales a la derecha y un botón "Menú" en pantallas estrechas.
 // `onInicio` hace clicable el logo; `actual` resalta la sección activa.
-const NAV_LINKS = [["recetario", "Recetario"], ["cine", "Cine y series"], ["actualidad", "Actualidad"], ["restaurantes", "Restaurantes"]];
+/* La barra lleva pocos carteles para no cargarse: Recetario y Restaurantes
+   sueltos, y el resto de secciones agrupadas bajo el desplegable "Categorías"
+   (cine, actualidad y, con sesión iniciada, favoritos). */
+const CATEGORIAS_NAV = [["cine", "Cine y series"], ["actualidad", "Actualidad"]];
+const categoriasNav = (user) => (user ? [...CATEGORIAS_NAV, ["favoritos", "♥ Favoritos"]] : CATEGORIAS_NAV);
+// Lista plana para el menú lateral móvil, donde no hay desplegable.
+const enlacesNav = (user) => [["recetario", "Recetario"], ...categoriasNav(user), ["restaurantes", "Restaurantes"]];
 function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const irARutina = useContext(RutinaCtx);
+  const { user } = useAuth();
   const logo = <span style={{ ...DF, fontSize: 19, letterSpacing: "0.14em" }}>PULSO<span style={{ color: C.hot1 }}>.</span></span>;
   return (
     <header style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20 }}>
@@ -335,9 +421,9 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
           : <div style={{ padding: "4px 10px" }}>{logo}</div>}
         <nav className="nav-escritorio" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8 }}>
           {irARutina && <BotonCartel activo={actual === "rutina"} onClick={irARutina}>Mi rutina</BotonCartel>}
-          {NAV_LINKS.map(([id, t]) => (
-            <BotonCartel key={id} activo={actual === id} onClick={() => onIrSeccion(id)}>{t}</BotonCartel>
-          ))}
+          <BotonCartel activo={actual === "recetario"} onClick={() => onIrSeccion("recetario")}>Recetario</BotonCartel>
+          <MenuCategorias actual={actual} onIrSeccion={onIrSeccion} user={user} />
+          <BotonCartel activo={actual === "restaurantes"} onClick={() => onIrSeccion("restaurantes")}>Restaurantes</BotonCartel>
         </nav>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           {acciones}
@@ -358,6 +444,7 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
 // reversa y solo entonces se desmonta (por eso el cierre pasa por `cerrar`).
 function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
   const irARutina = useContext(RutinaCtx);
+  const { user } = useAuth();
   const velo = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const tl = useRef<gsap.core.Timeline | null>(null);
@@ -386,7 +473,7 @@ function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
         <button className="nav-item menu-enlace" onClick={cerrar} aria-label="Cerrar menú" style={{ alignSelf: "flex-end", fontSize: 20, lineHeight: 1, padding: "8px 12px" }}>×</button>
         {onInicio && <BotonCartel className="menu-enlace" variante="bloque" onClick={ir(onInicio)}>Inicio</BotonCartel>}
         {irARutina && <BotonCartel className="menu-enlace" variante="bloque" activo={actual === "rutina"} onClick={ir(irARutina)}>Mi rutina</BotonCartel>}
-        {NAV_LINKS.map(([id, t]) => (
+        {enlacesNav(user).map(([id, t]) => (
           <BotonCartel key={id} className="menu-enlace" variante="bloque" activo={actual === id} onClick={ir(() => onIrSeccion(id))}>{t}</BotonCartel>
         ))}
         <div className="menu-enlace" style={{ height: 1, background: C.line, margin: "10px 4px" }} />
@@ -932,8 +1019,19 @@ function FichaReceta({ r, abierto, onToggle, onBorrar }: any) {
   // Las fotos externas pueden caerse: se prueba primero la genérica del plato
   // y, si también falla, onImgError pinta el degradado de marca.
   const conRespaldo = (e) => { const t = e.currentTarget; if (t.src !== generica) t.src = generica; else onImgError(e); };
+  // Corazón de favoritos (solo con sesión iniciada). Va como hermano absoluto
+  // del botón-cabecera, no dentro, porque no se pueden anidar botones.
+  const fav = useContext(FavoritosCtx);
+  const esFav = !!fav && fav.ids.includes(r.id);
   return (
-    <div className="exwrap" style={{ background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
+    <div className="exwrap" style={{ position: "relative", background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
+      {fav && (
+        <button onClick={() => fav.alternar(r.id)} aria-pressed={esFav} aria-label={esFav ? `Quitar ${r.nombre} de favoritos` : `Guardar ${r.nombre} en favoritos`}
+          title={esFav ? "Quitar de favoritos" : "Guardar en favoritos"}
+          style={{ position: "absolute", top: 8, left: 8, zIndex: 2, width: 32, height: 32, padding: 0, borderRadius: "50%", background: "#fff", border: `2px solid ${C.line}`, boxShadow: `2px 2px 0 ${C.line}`, display: "grid", placeItems: "center", fontSize: 15, lineHeight: 1, color: esFav ? C.hot1 : C.line }}>
+          {esFav ? "♥" : "♡"}
+        </button>
+      )}
       <button onClick={onToggle} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
         <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
           <img className="eximg" src={thumb} alt={r.nombre} loading="lazy" onError={conRespaldo} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
@@ -1055,34 +1153,43 @@ function Actualidad({ onBack, onLogin, onIrSeccion }) {
 const CATS_RECETARIO = [["todas", "Todas"], ["desayuno", "Desayunos"], ["comida", "Comidas"], ["cena", "Cenas"], ["snack", "Snacks"], ["cine", "🎬 De cine"], ["actualidad", "📰 Actualidad"], ["comunidad", "👥 Comunidad"]];
 const NOMBRE_CAT = { desayuno: "Desayuno", comida: "Comida", cena: "Cena", snack: "Snack" };
 
-function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
-  const { user, enabled } = useAuth();
-  const [busqueda, setBusqueda] = useState("");
-  const [cat, setCat] = useState("todas");
-  const [abierta, setAbierta] = useState<string | null>(null);
-  // Recetas publicadas por la comunidad (tabla recetas_comunidad). En modo
-  // invitado sin Supabase la lista queda vacía y la sección funciona igual.
+// Recetas publicadas por la comunidad (tabla recetas_comunidad). En modo
+// invitado sin Supabase la lista queda vacía y las pantallas funcionan igual.
+function useRecetasComunidad() {
   const [comunidad, setComunidad] = useState<any[]>([]);
   useEffect(() => {
     if (!supabase) return;
     supabase.from("recetas_comunidad").select("id, user_id, autor, receta").order("creado_en", { ascending: false })
       .then(({ data }) => setComunidad(data ?? []));
   }, []);
+  return [comunidad, setComunidad] as const;
+}
+
+// Todas las recetas de la app (comunidad + plan + cine + actualidad) en el
+// modelo unificado de FichaReceta. Lo comparten el recetario y los favoritos.
+const recetasUnificadas = (comunidad) => [
+  ...comunidad.map((row) => ({
+    id: row.id, user_id: row.user_id, nombre: row.receta.nombre, img: row.receta.img, categoria: "comunidad",
+    kcal: row.receta.kcalAprox, etiqueta: `👥 Comunidad · ${row.autor}`,
+    ingredientes: row.receta.ingredientes, pasos: row.receta.pasos, youtube: youtubeUrl(row.receta.nombre),
+  })),
+  ...RECETAS.map((r) => ({ id: r.id, nombre: r.nombre, img: r.img, categoria: r.categoria, kcal: r.kcalAprox, etiqueta: NOMBRE_CAT[r.categoria], ingredientes: r.ingredientes, pasos: r.pasos, youtube: youtubeUrl(r.nombre) })),
+  ...RECETAS_CINE.map((r) => ({ ...fichaDeCine(r), categoria: "cine" })),
+  ...RECETAS_ACTUALIDAD.map((r) => ({ ...fichaDeActualidad(r), categoria: "actualidad" })),
+];
+
+function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
+  const { user, enabled } = useAuth();
+  const [busqueda, setBusqueda] = useState("");
+  const [cat, setCat] = useState("todas");
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [comunidad, setComunidad] = useRecetasComunidad();
   const borrarComunidad = async (id) => {
     if (!supabase || !window.confirm("¿Seguro que quieres borrar esta receta? No se puede deshacer.")) return;
     const { error } = await supabase.from("recetas_comunidad").delete().eq("id", id);
     if (!error) setComunidad((c) => c.filter((r) => r.id !== id));
   };
-  const todas = useMemo(() => [
-    ...comunidad.map((row) => ({
-      id: row.id, user_id: row.user_id, nombre: row.receta.nombre, img: row.receta.img, categoria: "comunidad",
-      kcal: row.receta.kcalAprox, etiqueta: `👥 Comunidad · ${row.autor}`,
-      ingredientes: row.receta.ingredientes, pasos: row.receta.pasos, youtube: youtubeUrl(row.receta.nombre),
-    })),
-    ...RECETAS.map((r) => ({ id: r.id, nombre: r.nombre, img: r.img, categoria: r.categoria, kcal: r.kcalAprox, etiqueta: NOMBRE_CAT[r.categoria], ingredientes: r.ingredientes, pasos: r.pasos, youtube: youtubeUrl(r.nombre) })),
-    ...RECETAS_CINE.map((r) => ({ ...fichaDeCine(r), categoria: "cine" })),
-    ...RECETAS_ACTUALIDAD.map((r) => ({ ...fichaDeActualidad(r), categoria: "actualidad" })),
-  ], [comunidad]);
+  const todas = useMemo(() => recetasUnificadas(comunidad), [comunidad]);
   const q = normalizar(busqueda.trim());
   const lista = todas.filter((r) => (cat === "todas" || r.categoria === cat)
     && (!q || normalizar(r.nombre).includes(q) || r.ingredientes.some((ing) => normalizar(ing.nombre).includes(q))));
@@ -1128,6 +1235,52 @@ function Recetario({ onBack, onLogin, onIrSeccion, onCrear }) {
               </Aparece>
             ))}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Sección "Favoritos": las recetas que el usuario marcó con el corazón,
+// guardadas en su cuenta (tabla favoritos). El menú solo la enlaza con sesión
+// iniciada; si se llega sin sesión (p. ej. tras salir), invita a entrar.
+function Favoritos({ onBack, onLogin, onIrSeccion }) {
+  const { user } = useAuth();
+  const fav = useContext(FavoritosCtx);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [comunidad] = useRecetasComunidad();
+  const todas = useMemo(() => recetasUnificadas(comunidad), [comunidad]);
+  // Ids sin receta (p. ej. una de la comunidad ya borrada) se ignoran sin más.
+  const lista = fav ? todas.filter((r) => fav.ids.includes(r.id)) : [];
+  return (
+    <div>
+      <CabeceraSeccion banner={BANNER_FAVORITOS} kicker="Tu colección · Solo la ves tú" titulo={<>Tus <span style={gradText}>favoritos</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="favoritos" />
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "24px 18px 80px" }}>
+        {!user ? (
+          <div className="fadeUp" style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "30px 22px", textAlign: "center" }}>
+            <div style={{ fontSize: 28 }}>♥</div>
+            <div style={{ ...DF, fontWeight: 800, fontSize: 18, marginTop: 8 }}>Tus favoritos te esperan</div>
+            <p style={{ color: C.dim, fontSize: 14, margin: "6px 0 16px" }}>Inicia sesión para guardar recetas con el corazón y tenerlas siempre a mano.</p>
+            <button className="btn-cta" onClick={onLogin} style={{ ...btnPrimario, minWidth: 0, padding: "10px 24px" }}>Iniciar sesión</button>
+          </div>
+        ) : lista.length === 0 ? (
+          <div className="fadeUp" style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "30px 22px", textAlign: "center" }}>
+            <div style={{ fontSize: 28 }}>♡</div>
+            <div style={{ ...DF, fontWeight: 800, fontSize: 18, marginTop: 8 }}>Aún no tienes favoritos</div>
+            <p style={{ color: C.dim, fontSize: 14, margin: "6px 0 16px" }}>Pulsa el corazón de cualquier receta del recetario, del cine o de la actualidad y aparecerá aquí.</p>
+            <button className="btn-cta" onClick={() => onIrSeccion("recetario")} style={{ ...btnPrimario, minWidth: 0, padding: "10px 24px" }}>Ir al recetario</button>
+          </div>
+        ) : (
+          <>
+            <p className="fadeUp" style={{ color: C.dim, fontSize: 15, lineHeight: 1.6, margin: "0 0 20px", maxWidth: 640 }}>{lista.length === 1 ? "1 receta guardada" : `${lista.length} recetas guardadas`} en tu cuenta, disponibles desde cualquier dispositivo. Vuelve a pulsar el corazón para sacar una de la lista.</p>
+            <div style={{ display: "grid", gap: 14 }}>
+              {lista.map((r, i) => (
+                <Aparece key={r.id} delay={Math.min(i, 6) * 55} rot={i % 2 ? 1.4 : -1.4}>
+                  <FichaReceta r={r} abierto={abierta === r.id} onToggle={() => setAbierta(abierta === r.id ? null : r.id)} />
+                </Aparece>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
