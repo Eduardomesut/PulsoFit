@@ -65,6 +65,56 @@ create policy "planes_propios" on public.planes
 -- sin esto el guardado del plan falla siempre con 42501 y la tabla queda vacía).
 grant select, insert, update, delete on public.planes to authenticated;
 
+-- ---------- Chef IA: cuota diaria de consultas ----------
+-- Cada usuario tiene un contador de consultas por día. La Edge Function
+-- `chef` llama a consumir_uso_chef() antes de cada consulta a la IA:
+-- si devuelve -1, la cuota está agotada y no se llama al modelo.
+create table if not exists public.chef_usos (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  dia date not null default current_date,
+  usados int not null default 0,
+  primary key (user_id, dia)
+);
+
+alter table public.chef_usos enable row level security;
+
+-- El usuario puede consultar su propio consumo; solo la función (security
+-- definer) escribe en la tabla.
+drop policy if exists "chef_usos_ver_propio" on public.chef_usos;
+create policy "chef_usos_ver_propio" on public.chef_usos
+  for select using (auth.uid() = user_id);
+
+grant select on public.chef_usos to authenticated;
+
+-- Consume un uso de forma atómica y devuelve cuántos quedan hoy,
+-- o -1 si la cuota ya estaba agotada. El límite vive aquí, en la BD:
+-- el cliente no puede saltárselo.
+create or replace function public.consumir_uso_chef(limite int default 10)
+returns int
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_usados int;
+begin
+  if auth.uid() is null then
+    return -1;
+  end if;
+  insert into chef_usos (user_id, dia, usados)
+  values (auth.uid(), current_date, 1)
+  on conflict (user_id, dia) do update
+    set usados = chef_usos.usados + 1
+    where chef_usos.usados < limite
+  returning usados into v_usados;
+  if v_usados is null then
+    return -1; -- el WHERE impidió el update: cuota agotada
+  end if;
+  return limite - v_usados;
+end;
+$$;
+
+grant execute on function public.consumir_uso_chef(int) to authenticated;
+
 -- ============================================================
 -- Las Fases 2 (progreso) y 3 (amigos) añadirán las tablas
 -- `registros` y `amistades` aquí más adelante.

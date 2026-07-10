@@ -511,6 +511,36 @@ export const OBJETIVOS = [
   { id: "musculo", titulo: "Ganar músculo", desc: "Alta proteína para construir masa", img: U("1467003909585-2f8a72700288") },
 ];
 
+/* ---------- Contexto para el Chef IA ----------
+   El chat envía a la Edge Function un contexto compacto en texto plano:
+   el catálogo resumido (sin ingredientes ni pasos, para gastar pocos
+   tokens) y las preferencias del usuario. Son funciones puras para
+   poder testearlas. */
+
+export function resumenCatalogo() {
+  return RECETAS.map((r) => {
+    const etiquetas = [r.categoria, `~${r.kcalAprox} kcal`];
+    if (r.dietas.length) etiquetas.push(r.dietas.join("/"));
+    if (r.alergenos.length) etiquetas.push(`alérgenos: ${r.alergenos.join("/")}`);
+    return `- ${r.nombre} (${etiquetas.join(", ")})`;
+  }).join("\n");
+}
+
+export function resumenUsuario(datos) {
+  if (!datos) return "";
+  const partes: string[] = [];
+  const dieta = TIPOS_DIETA.find((t) => t.id === datos.tipoDieta);
+  if (dieta && dieta.id !== "omnivora") partes.push(`Dieta: ${dieta.titulo}`);
+  const obj = OBJETIVOS.find((o) => o.id === datos.objetivo);
+  if (obj) partes.push(`Objetivo: ${obj.titulo}`);
+  const alergias = ALERGENOS.filter((a) => (datos.alergias ?? []).includes(a.id)).map((a) => a.nombre);
+  if (alergias.length) partes.push(`Alergias e intolerancias (estrictas): ${alergias.join(", ")}`);
+  const noGusta = ALIMENTOS.filter((a) => (datos.noGusta ?? []).includes(a.id)).map((a) => a.nombre);
+  if (noGusta.length) partes.push(`No le gusta: ${noGusta.join(", ")}`);
+  if ([3, 4, 5].includes(datos.comidasDia)) partes.push(`Hace ${datos.comidasDia} comidas al día`);
+  return partes.join(". ");
+}
+
 /* Migra un plan guardado con el formato antiguo (app con entrenamientos)
    al formato actual. Los objetivos antiguos se traducen a los nuevos y
    los campos de fitness (nivel, dias) desaparecen. */

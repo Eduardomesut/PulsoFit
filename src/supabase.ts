@@ -10,3 +10,7 @@ const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 export const isSupabaseConfigured = Boolean(url && anon);
 
 export const supabase = isSupabaseConfigured ? createClient(url as string, anon as string) : null;
+
+// URL y clave pública, para llamar a las Edge Functions (Chef IA) con fetch.
+export const supabaseUrl = url ?? null;
+export const supabaseAnonKey = anon ?? null;

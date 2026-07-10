@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  normalizar, youtubeUrl, SEMANA, REPARTO, ALIMENTOS,
+  normalizar, youtubeUrl, SEMANA, REPARTO, ALIMENTOS, RECETAS,
   filtrarRecetas, buildDiet, calcularMetricas, migrarDatos,
+  resumenCatalogo, resumenUsuario,
 } from "./logica";
 
 // Datos completos de un usuario sin ninguna restricción, base de muchos tests.
@@ -256,6 +257,26 @@ describe("helpers", () => {
     expect(youtubeUrl("Tortilla de patatas")).toBe(
       `https://www.youtube.com/results?search_query=${encodeURIComponent("Tortilla de patatas receta")}`,
     );
+  });
+
+  it("resumenCatalogo incluye todas las recetas en formato compacto", () => {
+    const resumen = resumenCatalogo();
+    for (const r of RECETAS) expect(resumen).toContain(r.nombre);
+    // Sin ingredientes ni pasos: debe ser barato en tokens.
+    expect(resumen.length).toBeLessThan(8000);
+    expect(resumen).not.toContain("Calienta"); // ningún paso de elaboración
+  });
+
+  it("resumenUsuario refleja dieta, objetivo y restricciones", () => {
+    const r = resumenUsuario({ objetivo: "perder", tipoDieta: "vegana", alergias: ["gluten"], noGusta: ["pollo"], comidasDia: 3 });
+    expect(r).toContain("Vegana");
+    expect(r).toContain("Perder peso");
+    expect(r).toContain("Gluten");
+    expect(r).toContain("Pollo / pavo");
+    expect(r).toContain("3 comidas");
+    // La dieta omnívora no aporta información: no se menciona.
+    expect(resumenUsuario({ tipoDieta: "omnivora", alergias: [], noGusta: [] })).toBe("");
+    expect(resumenUsuario(null)).toBe("");
   });
 
   it("los porcentajes de cada REPARTO suman 1 y las categorías son válidas", () => {
