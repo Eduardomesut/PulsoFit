@@ -37,12 +37,8 @@ jobs:
         run: npm test
 
       - name: Compilar
+        # Las credenciales públicas de Supabase van en .env.production (committeado).
         run: npm run build
-        env:
-          # Credenciales públicas de Supabase (Settings → Variables). Si no se
-          # definen, la app se compila igual y funciona en modo invitado.
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5

@@ -20,15 +20,11 @@ En **Project Settings → API**, copia:
 
 (La clave `anon` es pública; no pasa nada por que se vea. La seguridad la dan las políticas RLS.)
 
-## 4. Publícalas en GitHub (para el despliegue)
-En el repo: **Settings → Secrets and variables → Actions → pestaña _Variables_ → New repository variable**. Crea las dos:
-
-| Nombre | Valor |
-|--------|-------|
-| `VITE_SUPABASE_URL` | tu Project URL |
-| `VITE_SUPABASE_ANON_KEY` | tu anon public key |
-
-Luego lanza el despliegue (haz un push, o **Actions → Deploy to GitHub Pages → Run workflow**). El login aparecerá automáticamente.
+## 4. Ponlas en `.env.production`
+Este repo ya incluye un `.env.production` con las credenciales del proyecto actual.
+Si algún día cambias de proyecto Supabase, edita ese archivo con la nueva URL y clave
+y haz push: el despliegue las incorpora automáticamente. (La clave `anon` es pública
+por diseño, así que puede vivir en el repo sin problema.)
 
 ## 5. (Opcional) Desarrollo local
 Copia `.env.example` a `.env.local` y rellena los dos valores. Luego `npm run dev`.
