@@ -40,3 +40,24 @@ Por defecto Supabase envía un email de confirmación al registrarse. Para proba
 - El **último plan** generado por cada usuario, que se recupera al iniciar sesión ("Continuar con mi plan guardado").
 
 Las Fases 2 (registrar progreso) y 3 (amigos y ver su progreso) se construirán sobre esta misma base.
+
+## 7. Chef IA (chat de cocina para usuarios)
+
+El Chef IA es un chat exclusivo para usuarios con sesión, con **10 consultas al día** por usuario. La clave de la API de Claude nunca toca el navegador: vive como secret en una Edge Function.
+
+Pasos (necesitas la [CLI de Supabase](https://supabase.com/docs/guides/cli) y una clave de API de [console.anthropic.com](https://console.anthropic.com)):
+
+1. **Re-ejecuta `supabase/schema.sql`** en el SQL Editor (añade la tabla `chef_usos` y la función `consumir_uso_chef`, que aplica la cuota diaria en la base de datos).
+2. **Vincula el proyecto y guarda la clave como secret:**
+   ```bash
+   supabase link --project-ref TU_PROJECT_REF
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   ```
+3. **Despliega la función:**
+   ```bash
+   supabase functions deploy chef
+   ```
+
+Nada más. El front ya sabe hablar con ella; si la función no está desplegada, la sección Chef IA muestra un aviso amable y el resto de la app no se ve afectada.
+
+**Coste:** usa Claude Haiku (el modelo económico), con respuestas acotadas y el catálogo compactado: cada consulta cuesta ~0,4 céntimos. Con la cuota de 10/día, incluso 50 usuarios activos a diario quedarían en ~15 €/mes como techo absoluto — y el uso real suele ser una fracción de eso. El límite se cambia en un solo sitio: `LIMITE_DIARIO` en `supabase/functions/chef/index.ts` (y el `limite` por defecto de la función SQL).

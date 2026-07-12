@@ -3,7 +3,7 @@ import Lenis from "lenis";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useAuth } from "./auth";
-import { supabase } from "./supabase";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./supabase";
 
 gsap.registerPlugin(ScrollTrigger);
 // ¿El usuario pide menos movimiento? Entonces ni scroll suave ni animaciones.
@@ -27,6 +27,7 @@ import {
   U, youtubeUrl, normalizar, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS,
   RECETAS, RECETAS_CINE, RECETAS_ACTUALIDAD, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
   INGREDIENTES_WEB, CATEGORIAS_RECETA, validarRecetaComunidad, puedeBorrarReceta,
+  resumenCatalogo, resumenUsuario,
 } from "./logica";
 
 /* ============================================================
@@ -72,6 +73,7 @@ const BANNER_ACTUALIDAD = U("1495020689067-958852a7765e"); // periódicos, cabec
 const BANNER_RECETARIO = U("1466637574441-749b8f19452f"); // mesa con ingredientes, cabecera del recetario
 const BANNER_RESTAURANTES = U("1517248135467-4c7edcad34c4"); // interior de restaurante, cabecera de la sección de restaurantes
 const BANNER_FAVORITOS = U("1490474418585-ba9bad8fd0ea"); // frutas en corazón, cabecera de la sección de favoritos
+const BANNER_CHEF = U("1556910103-1c02745aae4d"); // manos cocinando, cabecera del Chef IA
 
 /* Enlace "Mi rutina" del menú: App lo rellena cuando hay sesión iniciada y un
    plan que enseñar (el de la sesión actual o el guardado en Supabase); null lo
@@ -152,7 +154,7 @@ export default function App() {
   // Secciones de catálogo (recetario y cine): recuerdan desde qué pantalla se
   // abrieron para volver a ella; saltar de una sección a otra no pisa ese origen.
   const [seccionDesde, setSeccionDesde] = useState("hero");
-  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes" || f === "actualidad" || f === "favoritos";
+  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes" || f === "actualidad" || f === "favoritos" || f === "chef";
   const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
 
   return (
@@ -219,6 +221,7 @@ export default function App() {
       {fase === "crear" && <CrearReceta onVolver={() => setFase("recetario")} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "restaurantes" && <Restaurantes datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "favoritos" && <Favoritos onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "chef" && <Chef datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
     </FavoritosCtx.Provider>
@@ -400,13 +403,13 @@ function MenuCategorias({ actual, onIrSeccion, user }) {
 // izquierda, enlaces monoespaciados centrados (escritorio), acciones
 // contextuales a la derecha y un botón "Menú" en pantallas estrechas.
 // `onInicio` hace clicable el logo; `actual` resalta la sección activa.
-/* La barra lleva pocos carteles para no cargarse: Recetario y Restaurantes
-   sueltos, y el resto de secciones agrupadas bajo el desplegable "Categorías"
-   (cine, actualidad y, con sesión iniciada, favoritos). */
+/* La barra lleva pocos carteles para no cargarse: Recetario, Restaurantes y
+   Chef IA sueltos, y el resto de secciones agrupadas bajo el desplegable
+   "Categorías" (cine, actualidad y, con sesión iniciada, favoritos). */
 const CATEGORIAS_NAV = [["cine", "Cine y series"], ["actualidad", "Actualidad"]];
 const categoriasNav = (user) => (user ? [...CATEGORIAS_NAV, ["favoritos", "♥ Favoritos"]] : CATEGORIAS_NAV);
 // Lista plana para el menú lateral móvil, donde no hay desplegable.
-const enlacesNav = (user) => [["recetario", "Recetario"], ...categoriasNav(user), ["restaurantes", "Restaurantes"]];
+const enlacesNav = (user) => [["recetario", "Recetario"], ...categoriasNav(user), ["restaurantes", "Restaurantes"], ["chef", "Chef IA"]];
 function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const irARutina = useContext(RutinaCtx);
@@ -424,6 +427,7 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
           <BotonCartel activo={actual === "recetario"} onClick={() => onIrSeccion("recetario")}>Recetario</BotonCartel>
           <MenuCategorias actual={actual} onIrSeccion={onIrSeccion} user={user} />
           <BotonCartel activo={actual === "restaurantes"} onClick={() => onIrSeccion("restaurantes")}>Restaurantes</BotonCartel>
+          <BotonCartel activo={actual === "chef"} onClick={() => onIrSeccion("chef")}>Chef IA</BotonCartel>
         </nav>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           {acciones}
@@ -1463,6 +1467,142 @@ function Restaurantes({ datos, onBack, onLogin, onIrSeccion }) {
           </div>
         )}
         <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>ℹ️ Los resultados y reseñas son de Google Maps. Si tienes alergias, confirma siempre las opciones directamente con el restaurante.</div>
+      </div>
+    </div>
+  );
+}
+
+// Sección "Chef IA": chat de cocina exclusivo para usuarios con sesión.
+// El navegador nunca ve la clave de la IA: habla con la Edge Function
+// `chef` de Supabase, que valida el JWT, descuenta la cuota diaria y
+// reenvía la respuesta de Claude en streaming.
+const SUGERENCIAS_CHEF = [
+  "¿Qué puedo cenar hoy?",
+  "Dame una receta con lo que tengo en la nevera",
+  "¿Cómo adapto una receta a mi dieta?",
+  "Trucos para dejar la semana cocinada en 2 horas",
+];
+
+function Chef({ datos, onBack, onLogin, onIrSeccion }) {
+  const { enabled, user } = useAuth();
+  const [mensajes, setMensajes] = useState<{ rol: "usuario" | "chef"; texto: string }[]>([]);
+  const [texto, setTexto] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [restantes, setRestantes] = useState<number | null>(null);
+  const finRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { if (mensajes.length) finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [mensajes]);
+
+  // Contexto compacto que acompaña cada consulta: preferencias, plan de hoy
+  // (si existe) y el catálogo resumido. Todo texto plano y barato en tokens.
+  const contexto = useMemo(() => {
+    const partes: string[] = [];
+    const u = resumenUsuario(datos);
+    if (u) partes.push(`Sobre el usuario: ${u}.`);
+    if (datos?.objetivo && datos?.sexo) {
+      const m = calcularMetricas(datos);
+      const hoy = buildDiet(datos, m.kcal)[(new Date().getDay() + 6) % 7];
+      partes.push(`Su plan de hoy (${hoy.dia}): ${hoy.comidas.map((c) => `${c.nombre} — ${c.receta.nombre}`).join("; ")}. Objetivo diario: ${m.kcal} kcal y ${m.prot} g de proteína.`);
+    }
+    partes.push(`Catálogo de recetas de PULSO:\n${resumenCatalogo()}`);
+    return partes.join("\n\n");
+  }, [datos]);
+
+  const enviar = async (pregunta) => {
+    const limpio = String(pregunta ?? "").trim();
+    if (!limpio || ocupado || !supabase || !supabaseUrl) return;
+    setTexto("");
+    setOcupado(true);
+    const historial = [...mensajes, { rol: "usuario" as const, texto: limpio }];
+    setMensajes([...historial, { rol: "chef", texto: "" }]);
+    const pintarRespuesta = (fn: (previo: string) => string) =>
+      setMensajes((ms) => { const copia = [...ms]; copia[copia.length - 1] = { rol: "chef", texto: fn(copia[copia.length - 1].texto) }; return copia; });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Tu sesión ha caducado. Vuelve a iniciar sesión.");
+      const resp = await fetch(`${supabaseUrl}/functions/v1/chef`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, apikey: supabaseAnonKey!, "content-type": "application/json" },
+        body: JSON.stringify({ mensajes: historial.slice(-12), contexto }),
+      });
+      if (!resp.ok) {
+        const cuerpo = await resp.json().catch(() => null);
+        if (resp.status === 429) setRestantes(0);
+        throw new Error(cuerpo?.error || "El chef no ha podido responder. Inténtalo de nuevo en unos segundos.");
+      }
+      const usos = resp.headers.get("x-usos-restantes");
+      if (usos != null) setRestantes(+usos);
+      // La respuesta llega como SSE de la API de Claude: acumulamos los
+      // fragmentos de texto (content_block_delta) según van llegando.
+      const lector = resp.body!.getReader();
+      const decodificador = new TextDecoder();
+      let bufer = "";
+      for (;;) {
+        const { value, done } = await lector.read();
+        if (done) break;
+        bufer += decodificador.decode(value, { stream: true });
+        const lineas = bufer.split("\n");
+        bufer = lineas.pop() ?? "";
+        for (const linea of lineas) {
+          if (!linea.startsWith("data: ")) continue;
+          try {
+            const evento = JSON.parse(linea.slice(6));
+            if (evento.type === "content_block_delta" && evento.delta?.type === "text_delta") {
+              pintarRespuesta((previo) => previo + evento.delta.text);
+            }
+          } catch { /* fragmentos incompletos o eventos que no interesan */ }
+        }
+      }
+      pintarRespuesta((previo) => previo || "El chef se ha quedado sin palabras. Prueba a preguntarlo de otra forma.");
+    } catch (e: any) {
+      pintarRespuesta(() => `⚠️ ${e?.message || "El chef no ha podido responder. Inténtalo de nuevo."}`);
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  return (
+    <div>
+      <CabeceraSeccion banner={BANNER_CHEF} kicker="Tu asistente de cocina · Exclusivo para usuarios" titulo={<>Chef <span style={gradText}>PULSO</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="chef" />
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 18px 80px" }}>
+        {!enabled ? (
+          <div className="fadeUp" style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 18, padding: "40px 22px", textAlign: "center", color: C.dim, fontSize: 14, lineHeight: 1.6 }}>
+            El Chef IA necesita que la app esté conectada a Supabase. En esta instalación no está configurado.
+          </div>
+        ) : !user ? (
+          <div className="fadeUp" style={{ background: C.panel, borderRadius: 18, padding: "44px 22px", textAlign: "center" }}>
+            <div style={{ fontSize: 30 }}>👨‍🍳</div>
+            <div style={{ ...DF, fontWeight: 800, fontSize: 20, marginTop: 8 }}>Tu chef personal te espera</div>
+            <p style={{ color: C.dim, fontSize: 14, margin: "8px auto 20px", maxWidth: 420, lineHeight: 1.6 }}>Pregúntale cualquier duda de cocina: recetas con lo que tienes en la nevera, sustituciones, técnicas… Conoce tu dieta, tus alergias y todo el recetario de PULSO. Gratis, con 10 consultas al día.</p>
+            <button className="btn-cta" onClick={onLogin} style={btnPrimario}>Iniciar sesión para empezar</button>
+          </div>
+        ) : (
+          <>
+            <p className="fadeUp" style={{ color: C.dim, fontSize: 14, lineHeight: 1.6, margin: "0 0 18px" }}>
+              Pregúntale al chef lo que quieras sobre cocina: conoce tu dieta, tus alergias y el recetario de PULSO.
+              <span style={{ fontWeight: 700 }}> 10 consultas al día{restantes != null ? ` · te quedan ${Math.max(0, restantes)} hoy` : ""}.</span>
+            </p>
+            {mensajes.length === 0 && (
+              <div className="fadeUp" style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 18 }}>
+                {SUGERENCIAS_CHEF.map((s) => (
+                  <button key={s} onClick={() => enviar(s)} style={{ padding: "10px 18px", borderRadius: 999, fontWeight: 600, fontSize: 14, border: `1.5px solid ${C.line}`, color: C.dim, background: C.panel }}>{s}</button>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "grid", gap: 12 }}>
+              {mensajes.map((m, i) => (
+                <div key={i} className="fadeUp" style={{ justifySelf: m.rol === "usuario" ? "end" : "start", maxWidth: "85%", padding: "12px 16px", borderRadius: 18, fontSize: 15, lineHeight: 1.6, whiteSpace: "pre-wrap", ...(m.rol === "usuario" ? { ...grad, color: "#fff", borderBottomRightRadius: 6 } : { background: C.panel, color: C.text, borderBottomLeftRadius: 6 }) }}>
+                  {m.texto || (ocupado && i === mensajes.length - 1 ? "El chef está pensando…" : "")}
+                </div>
+              ))}
+              <div ref={finRef} />
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); enviar(texto); }} style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Pregunta al chef: ¿qué hago con pollo y calabacín?" aria-label="Pregunta para el chef" disabled={ocupado || restantes === 0} style={{ flex: 1, minWidth: 0, padding: "14px 20px", borderRadius: 999, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
+              <button className="btn-cta" type="submit" disabled={ocupado || restantes === 0 || !texto.trim()} style={{ ...btnPrimario, minWidth: 0, padding: "13px 28px", opacity: ocupado || restantes === 0 || !texto.trim() ? 0.55 : 1 }}>{ocupado ? "…" : "Enviar"}</button>
+            </form>
+            <div style={{ marginTop: 18, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 16, padding: "16px 18px", fontSize: 13, color: C.dim, lineHeight: 1.6 }}>👨‍🍳 El chef es una IA y puede equivocarse: sus respuestas son orientativas y no sustituyen el consejo de un médico o dietista. Con alergias, verifica siempre etiquetas e ingredientes.</div>
+          </>
+        )}
       </div>
     </div>
   );
