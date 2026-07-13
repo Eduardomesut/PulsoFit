@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, createContext, useContext } from "react";
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback, createContext, useContext } from "react";
 import Lenis from "lenis";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -28,6 +28,7 @@ import {
   RECETAS, RECETAS_CINE, RECETAS_ACTUALIDAD, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
   INGREDIENTES_WEB, CATEGORIAS_RECETA, validarRecetaComunidad, puedeBorrarReceta,
   resumenCatalogo, resumenUsuario,
+  normalizarUsuario, validarUsuario, MENSAJE_SOLICITUD, recetaSnapshot,
 } from "./logica";
 
 /* ============================================================
@@ -74,6 +75,7 @@ const BANNER_RECETARIO = U("1466637574441-749b8f19452f"); // mesa con ingredient
 const BANNER_RESTAURANTES = U("1517248135467-4c7edcad34c4"); // interior de restaurante, cabecera de la sección de restaurantes
 const BANNER_FAVORITOS = U("1490474418585-ba9bad8fd0ea"); // frutas en corazón, cabecera de la sección de favoritos
 const BANNER_CHEF = U("1556910103-1c02745aae4d"); // manos cocinando, cabecera del Chef IA
+const BANNER_AMIGOS = U("1543269865-cbf427effbad"); // amigos brindando, cabecera de la sección de amigos
 
 /* Enlace "Mi rutina" del menú: App lo rellena cuando hay sesión iniciada y un
    plan que enseñar (el de la sesión actual o el guardado en Supabase); null lo
@@ -86,6 +88,125 @@ const RutinaCtx = createContext<null | (() => void)>(null);
    oculta los corazones de las fichas y el enlace del menú. Va por contexto
    para que cualquier FichaReceta lo lea sin arrastrar props. */
 const FavoritosCtx = createContext<null | { ids: string[]; alternar: (id: string) => void }>(null);
+
+/* Estado social del usuario (amigos, solicitudes, chat). App lo rellena con
+   useSocialProvider solo con sesión iniciada y Supabase configurado; null
+   (invitado o sin Supabase) oculta la sección de amigos, el badge de
+   notificaciones y el botón de compartir de las fichas. Va por contexto para
+   que la cabecera y cualquier FichaReceta lo lean sin arrastrar props. */
+type Amigo = { amistad_id: string; id: string; usuario: string; nombre: string; creado_en?: string };
+type SocialValor = {
+  usuario: string | null;
+  amigos: Amigo[];
+  recibidas: Amigo[];
+  enviadas: Amigo[];
+  noLeidos: Record<string, number>;
+  novedades: number;
+  refrescar: () => void;
+  guardarUsuario: (u: string) => Promise<{ error: string | null }>;
+  enviarSolicitud: (handle: string) => Promise<string>;
+  responderSolicitud: (amistadId: string, aceptar: boolean) => Promise<void>;
+  eliminarAmigo: (amistadId: string) => Promise<void>;
+  enviarMensaje: (receptorId: string, contenido: { texto?: string; receta?: any }) => Promise<{ error: any; data: any }>;
+  marcarLeidos: (amigoId: string) => Promise<void>;
+};
+const SocialCtx = createContext<null | SocialValor>(null);
+
+/* Toda la lógica social vive aquí: carga el estado (RPC estado_social), el
+   handle del usuario y los mensajes sin leer, y se mantiene al día con una
+   suscripción realtime a `mensajes` y `amistades`. Devuelve null si no hay
+   sesión o Supabase, para que el contexto quede desactivado. */
+function useSocialProvider(user): SocialValor | null {
+  const [usuario, setUsuario] = useState<string | null>(null);
+  const [amigos, setAmigos] = useState<Amigo[]>([]);
+  const [recibidas, setRecibidas] = useState<Amigo[]>([]);
+  const [enviadas, setEnviadas] = useState<Amigo[]>([]);
+  const [noLeidos, setNoLeidos] = useState<Record<string, number>>({});
+
+  const cargarEstado = React.useCallback(async () => {
+    if (!supabase || !user) return;
+    const { data } = await supabase.rpc("estado_social");
+    if (data) {
+      setAmigos(data.amigos ?? []);
+      setRecibidas(data.recibidas ?? []);
+      setEnviadas(data.enviadas ?? []);
+    }
+  }, [user]);
+
+  const cargarNoLeidos = React.useCallback(async () => {
+    if (!supabase || !user) return;
+    const { data } = await supabase.from("mensajes").select("emisor").eq("receptor", user.id).eq("leido", false);
+    const conteo: Record<string, number> = {};
+    for (const m of data ?? []) conteo[m.emisor] = (conteo[m.emisor] ?? 0) + 1;
+    setNoLeidos(conteo);
+  }, [user]);
+
+  // Carga inicial: perfil (handle), estado social y mensajes sin leer.
+  useEffect(() => {
+    if (!supabase || !user) { setUsuario(null); setAmigos([]); setRecibidas([]); setEnviadas([]); setNoLeidos({}); return; }
+    supabase.from("perfiles").select("usuario").eq("id", user.id).maybeSingle()
+      .then(({ data }) => setUsuario(data?.usuario ?? null));
+    cargarEstado();
+    cargarNoLeidos();
+  }, [user, cargarEstado, cargarNoLeidos]);
+
+  // Realtime: cualquier mensaje o amistad que me afecte refresca lo pertinente.
+  // La RLS del cliente ya limita los eventos a filas que puedo ver; el refetch
+  // vuelve a leer con las políticas normales, así que es seguro en cualquier caso.
+  useEffect(() => {
+    if (!supabase || !user) return;
+    const canal = supabase.channel(`social:${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensajes", filter: `receptor=eq.${user.id}` }, () => cargarNoLeidos())
+      .on("postgres_changes", { event: "*", schema: "public", table: "amistades" }, () => cargarEstado())
+      .subscribe();
+    return () => { supabase!.removeChannel(canal); };
+  }, [user, cargarEstado, cargarNoLeidos]);
+
+  if (!supabase || !user) return null;
+  const uid = user.id;
+  const novedades = recibidas.length + Object.values(noLeidos).reduce((a, b) => a + b, 0);
+
+  return {
+    usuario, amigos, recibidas, enviadas, noLeidos, novedades,
+    refrescar: () => { cargarEstado(); cargarNoLeidos(); },
+    guardarUsuario: async (u) => {
+      const limpio = normalizarUsuario(u);
+      const err = validarUsuario(limpio);
+      if (err) return { error: err };
+      const { error } = await supabase!.from("perfiles").update({ usuario: limpio }).eq("id", uid);
+      if (error) {
+        // 23505 = índice único: el handle ya está cogido por otra persona.
+        if ((error as any).code === "23505") return { error: "Ese nombre de usuario ya está cogido. Prueba con otro." };
+        return { error: "No se pudo guardar el usuario. Inténtalo de nuevo." };
+      }
+      setUsuario(limpio);
+      return { error: null };
+    },
+    enviarSolicitud: async (handle) => {
+      const { data, error } = await supabase!.rpc("enviar_solicitud", { destino: normalizarUsuario(handle) });
+      if (error) return "error";
+      await cargarEstado();
+      return (data as string) ?? "error";
+    },
+    responderSolicitud: async (amistadId, aceptar) => {
+      if (aceptar) await supabase!.from("amistades").update({ estado: "aceptada" }).eq("id", amistadId);
+      else await supabase!.from("amistades").delete().eq("id", amistadId);
+      await cargarEstado();
+    },
+    eliminarAmigo: async (amistadId) => {
+      await supabase!.from("amistades").delete().eq("id", amistadId);
+      await cargarEstado();
+    },
+    enviarMensaje: async (receptorId, contenido) => {
+      const fila = { emisor: uid, receptor: receptorId, texto: contenido.texto ?? null, receta: contenido.receta ?? null };
+      return await supabase!.from("mensajes").insert(fila).select().single();
+    },
+    marcarLeidos: async (amigoId) => {
+      await supabase!.from("mensajes").update({ leido: true }).eq("receptor", uid).eq("emisor", amigoId).eq("leido", false);
+      setNoLeidos((m) => { const n = { ...m }; delete n[amigoId]; return n; });
+    },
+  };
+}
 
 export default function App() {
   const [fase, setFase] = useState("hero");
@@ -154,12 +275,16 @@ export default function App() {
   // Secciones de catálogo (recetario y cine): recuerdan desde qué pantalla se
   // abrieron para volver a ella; saltar de una sección a otra no pisa ese origen.
   const [seccionDesde, setSeccionDesde] = useState("hero");
-  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes" || f === "actualidad" || f === "favoritos" || f === "chef";
+  const esSeccion = (f) => f === "cine" || f === "recetario" || f === "restaurantes" || f === "actualidad" || f === "favoritos" || f === "chef" || f === "amigos";
   const irSeccion = (s) => { if (!esSeccion(fase)) setSeccionDesde(fase); setFase(s); };
+
+  // Estado social (amigos, chat, notificaciones): activo solo con sesión.
+  const social = useSocialProvider(user);
 
   return (
     <RutinaCtx.Provider value={irARutina}>
     <FavoritosCtx.Provider value={ctxFavoritos}>
+    <SocialCtx.Provider value={social}>
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: MONO, fontSize: 14 }}>
       <style>{`
         @keyframes fadeUp { from { opacity:0; transform:translateY(26px);} to {opacity:1; transform:none;} }
@@ -222,8 +347,10 @@ export default function App() {
       {fase === "restaurantes" && <Restaurantes datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "favoritos" && <Favoritos onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "chef" && <Chef datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
+      {fase === "amigos" && <Amigos onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
     </div>
+    </SocialCtx.Provider>
     </FavoritosCtx.Provider>
     </RutinaCtx.Provider>
   );
@@ -410,6 +537,25 @@ const CATEGORIAS_NAV = [["cine", "Cine y series"], ["actualidad", "Actualidad"]]
 const categoriasNav = (user) => (user ? [...CATEGORIAS_NAV, ["favoritos", "♥ Favoritos"]] : CATEGORIAS_NAV);
 // Lista plana para el menú lateral móvil, donde no hay desplegable.
 const enlacesNav = (user) => [["recetario", "Recetario"], ...categoriasNav(user), ["restaurantes", "Restaurantes"], ["chef", "Chef IA"]];
+
+// Enlace "Amigos" con badge de novedades (solicitudes + mensajes sin leer).
+// Lee el contexto social para el número; solo aparece con sesión iniciada.
+function EnlaceAmigos({ actual, onClick, variante = "chip" }: any) {
+  const social = useContext(SocialCtx);
+  const n = social ? social.novedades : 0;
+  const badge = n > 0 && (
+    <span aria-hidden="true" style={{ position: "absolute", top: -5, right: -5, minWidth: 17, height: 17, padding: "0 4px", boxSizing: "border-box", background: C.hot1, color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 800, lineHeight: "15px", textAlign: "center", border: "1.5px solid #fff" }}>{n > 9 ? "9+" : n}</span>
+  );
+  return (
+    <span style={{ position: "relative", display: variante === "bloque" ? "block" : "inline-block" }}>
+      <BotonCartel variante={variante} activo={actual === "amigos"} onClick={onClick} style={variante === "bloque" ? { width: "100%" } : undefined}>
+        Amigos{variante === "bloque" && n > 0 ? ` · ${n > 9 ? "9+" : n}` : ""}
+      </BotonCartel>
+      {variante === "chip" && badge}
+    </span>
+  );
+}
+
 function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const irARutina = useContext(RutinaCtx);
@@ -428,6 +574,7 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
           <MenuCategorias actual={actual} onIrSeccion={onIrSeccion} user={user} />
           <BotonCartel activo={actual === "restaurantes"} onClick={() => onIrSeccion("restaurantes")}>Restaurantes</BotonCartel>
           <BotonCartel activo={actual === "chef"} onClick={() => onIrSeccion("chef")}>Chef IA</BotonCartel>
+          {user && <EnlaceAmigos actual={actual} onClick={() => onIrSeccion("amigos")} />}
         </nav>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           {acciones}
@@ -480,6 +627,7 @@ function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
         {enlacesNav(user).map(([id, t]) => (
           <BotonCartel key={id} className="menu-enlace" variante="bloque" activo={actual === id} onClick={ir(() => onIrSeccion(id))}>{t}</BotonCartel>
         ))}
+        {user && <span className="menu-enlace"><EnlaceAmigos variante="bloque" actual={actual} onClick={ir(() => onIrSeccion("amigos"))} /></span>}
         <div className="menu-enlace" style={{ height: 1, background: C.line, margin: "10px 4px" }} />
         <span className="menu-enlace"><CuentaChip onLogin={ir(onLogin)} vertical /></span>
       </div>
@@ -1027,6 +1175,10 @@ function FichaReceta({ r, abierto, onToggle, onBorrar }: any) {
   // del botón-cabecera, no dentro, porque no se pueden anidar botones.
   const fav = useContext(FavoritosCtx);
   const esFav = !!fav && fav.ids.includes(r.id);
+  // Compartir con un amigo: solo si hay contexto social y al menos un amigo.
+  const social = useContext(SocialCtx);
+  const puedeCompartir = !!social && social.amigos.length > 0;
+  const [compartir, setCompartir] = useState(false);
   return (
     <div className="exwrap" style={{ position: "relative", background: C.panel, border: `1px solid ${abierto ? C.hot1 : C.line}`, borderRadius: 18, overflow: "hidden", transition: "border-color .15s" }}>
       {fav && (
@@ -1036,6 +1188,13 @@ function FichaReceta({ r, abierto, onToggle, onBorrar }: any) {
           {esFav ? "♥" : "♡"}
         </button>
       )}
+      {puedeCompartir && (
+        <button onClick={() => setCompartir(true)} aria-label={`Compartir ${r.nombre} con un amigo`} title="Compartir con un amigo"
+          style={{ position: "absolute", top: 8, left: fav ? 46 : 8, zIndex: 2, width: 32, height: 32, padding: 0, borderRadius: "50%", background: "#fff", border: `2px solid ${C.line}`, boxShadow: `2px 2px 0 ${C.line}`, display: "grid", placeItems: "center", fontSize: 14, lineHeight: 1, color: C.line }}>
+          ➦
+        </button>
+      )}
+      {compartir && <CompartirReceta receta={r} onCerrar={() => setCompartir(false)} />}
       <button onClick={onToggle} style={{ display: "flex", alignItems: "stretch", gap: 0, width: "100%", background: "none", border: "none", color: C.text, padding: 0, textAlign: "left" }}>
         <div style={{ width: 108, flexShrink: 0, overflow: "hidden", position: "relative" }}>
           <img className="eximg" src={thumb} alt={r.nombre} loading="lazy" onError={conRespaldo} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s ease" }} />
@@ -1604,6 +1763,378 @@ function Chef({ datos, onBack, onLogin, onIrSeccion }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Amigos, chat y recetas compartidas (Fase 3)
+   ============================================================ */
+
+// Avatar redondo con la inicial del usuario, en los colores de marca.
+function Avatar({ nombre, size = 40 }: { nombre: string; size?: number }) {
+  const inicial = (nombre || "?").trim().charAt(0).toUpperCase();
+  return (
+    <div style={{ width: size, height: size, flexShrink: 0, borderRadius: "50%", background: C.hot2, border: `2px solid ${C.line}`, display: "grid", placeItems: "center", ...DF, fontSize: size * 0.44, color: C.text }}>{inicial}</div>
+  );
+}
+
+// Modal para compartir una receta con un amigo por chat. Envía una instantánea
+// de la receta (recetaSnapshot) que se sigue viendo aunque la original se borre.
+function CompartirReceta({ receta, onCerrar }) {
+  const social = useContext(SocialCtx);
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const [enviadoA, setEnviadoA] = useState<string[]>([]);
+  if (!social) return null;
+  const enviar = async (amigo) => {
+    setEnviando(amigo.id);
+    const { error } = await social.enviarMensaje(amigo.id, { texto: `Te comparto esta receta: ${receta.nombre}`, receta: recetaSnapshot(receta) });
+    setEnviando(null);
+    if (!error) setEnviadoA((l) => [...l, amigo.id]);
+  };
+  return (
+    <div onClick={onCerrar} style={{ position: "fixed", inset: 0, background: "rgba(15,44,86,.5)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: 20, zIndex: 100 }}>
+      <div onClick={(e) => e.stopPropagation()} className="fadeUp" style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 16, padding: 22, border: `2px solid ${C.line}`, boxShadow: `8px 8px 0 ${C.line}`, maxHeight: "80vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ ...DF, fontWeight: 800, fontSize: 20 }}>Compartir receta</div>
+          <button onClick={onCerrar} aria-label="Cerrar" style={{ background: "none", border: "none", color: C.dim, fontSize: 24, lineHeight: 1 }}>×</button>
+        </div>
+        <p style={{ color: C.dim, fontSize: 13.5, margin: "4px 0 16px", lineHeight: 1.5 }}>Envía <b style={{ color: C.text }}>{receta.nombre}</b> a un amigo por el chat.</p>
+        <div style={{ display: "grid", gap: 8 }}>
+          {social.amigos.map((a) => {
+            const ya = enviadoA.includes(a.id);
+            return (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, border: `1px solid ${C.line}`, borderRadius: 12, padding: "8px 10px" }}>
+                <Avatar nombre={a.nombre || a.usuario} size={36} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ ...DF, fontWeight: 800, fontSize: 14 }}>{a.nombre || a.usuario}</div>
+                  <div style={{ fontSize: 12, color: C.dim }}>@{a.usuario}</div>
+                </div>
+                <button className="btn-cta" onClick={() => enviar(a)} disabled={ya || enviando === a.id} style={{ ...btnPrimario, minWidth: 0, padding: "8px 16px", fontSize: 12, opacity: ya || enviando === a.id ? 0.6 : 1, background: ya ? C.panel2 : C.hot2 }}>
+                  {ya ? "✓ Enviada" : enviando === a.id ? "…" : "Enviar"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tarjeta compacta de una receta recibida por chat: se despliega para ver
+// ingredientes y elaboración con el mismo detalle que el recetario.
+function RecetaCompartida({ receta }) {
+  const [abierto, setAbierto] = useState(false);
+  const generica = U(FOODIMG[receta.img] || FOODIMG.otro, 400);
+  const thumb = receta.fotoPlato || generica;
+  const conRespaldo = (e) => { const t = e.currentTarget; if (t.src !== generica) t.src = generica; else onImgError(e); };
+  return (
+    <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 14, overflow: "hidden", background: "#fff", marginTop: 8 }}>
+      <button onClick={() => setAbierto((a) => !a)} style={{ display: "flex", width: "100%", gap: 0, background: "none", border: "none", textAlign: "left", padding: 0, color: C.text, alignItems: "stretch" }}>
+        <img src={thumb} onError={conRespaldo} alt={receta.nombre} style={{ width: 66, flexShrink: 0, objectFit: "cover" }} />
+        <div style={{ padding: "8px 12px", flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: C.hot1, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>🍽 Receta compartida</div>
+          <div style={{ ...DF, fontWeight: 800, fontSize: 14, lineHeight: 1.25, marginTop: 2 }}>{receta.nombre}</div>
+          <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>{receta.kcal ? `~${receta.kcal} kcal · ` : ""}{abierto ? "ocultar receta ▲" : "ver receta ▼"}</div>
+        </div>
+      </button>
+      {abierto && (
+        <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.suave}` }}>
+          <DetalleReceta ingredientes={receta.ingredientes || []} pasos={receta.pasos || []} youtube={youtubeUrl(receta.nombre)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Conversación 1 a 1 con un amigo. Carga el historial, lo mantiene al día con
+// realtime, marca como leídos los mensajes recibidos y permite enviar texto.
+function Chat({ amigo, onVolver }) {
+  const social = useContext(SocialCtx);
+  const { user } = useAuth();
+  const uid = user?.id;
+  const [mensajes, setMensajes] = useState<any[]>([]);
+  const [texto, setTexto] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const finRef = useRef<HTMLDivElement | null>(null);
+
+  const cargar = useCallback(async () => {
+    if (!supabase || !uid) return;
+    const { data } = await supabase.from("mensajes").select("*")
+      .or(`and(emisor.eq.${uid},receptor.eq.${amigo.id}),and(emisor.eq.${amigo.id},receptor.eq.${uid})`)
+      .order("creado_en", { ascending: true });
+    setMensajes(data ?? []);
+    setCargando(false);
+  }, [uid, amigo.id]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [mensajes]);
+  // Al abrir la conversación y con cada mensaje nuevo, marca como leídos los suyos.
+  useEffect(() => { social?.marcarLeidos(amigo.id); }, [amigo.id, mensajes.length]); // eslint-disable-line
+
+  // Realtime: mensajes nuevos que me envía este amigo.
+  useEffect(() => {
+    if (!supabase || !uid) return;
+    const canal = supabase.channel(`chat:${uid}:${amigo.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensajes", filter: `receptor=eq.${uid}` },
+        (payload: any) => { if (payload.new.emisor === amigo.id) setMensajes((m) => (m.some((x) => x.id === payload.new.id) ? m : [...m, payload.new])); })
+      .subscribe();
+    return () => { supabase!.removeChannel(canal); };
+  }, [uid, amigo.id]);
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    const t = texto.trim();
+    if (!t || !social) return;
+    setTexto("");
+    const { data, error } = await social.enviarMensaje(amigo.id, { texto: t });
+    if (!error && data) setMensajes((m) => (m.some((x) => x.id === data.id) ? m : [...m, data]));
+  };
+
+  return (
+    <div className="fadeUp">
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <button className="nav-item" onClick={onVolver} style={{ fontSize: 13 }}>‹ Amigos</button>
+        <Avatar nombre={amigo.nombre || amigo.usuario} size={38} />
+        <div>
+          <div style={{ ...DF, fontWeight: 800, fontSize: 17 }}>{amigo.nombre || amigo.usuario}</div>
+          <div style={{ fontSize: 12, color: C.dim }}>@{amigo.usuario}</div>
+        </div>
+      </div>
+      <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: "14px 14px", minHeight: 320, maxHeight: "56vh", overflowY: "auto", display: "grid", gap: 10, alignContent: "start" }}>
+        {cargando ? (
+          <div style={{ color: C.dim, fontSize: 14, textAlign: "center", padding: 20 }}>Cargando conversación…</div>
+        ) : mensajes.length === 0 ? (
+          <div style={{ color: C.dim, fontSize: 14, textAlign: "center", padding: 20, lineHeight: 1.6 }}>Aún no os habéis escrito. ¡Rompe el hielo o compártele una receta! 🍽</div>
+        ) : mensajes.map((m) => {
+          const mio = m.emisor === uid;
+          return (
+            <div key={m.id} style={{ justifySelf: mio ? "end" : "start", maxWidth: "85%" }}>
+              {m.texto && (
+                <div style={{ padding: "10px 14px", borderRadius: 16, fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap", ...(mio ? { background: C.hot2, color: C.text, borderBottomRightRadius: 5 } : { background: C.panel2, color: C.text, borderBottomLeftRadius: 5 }) }}>{m.texto}</div>
+              )}
+              {m.receta && <RecetaCompartida receta={m.receta} />}
+            </div>
+          );
+        })}
+        <div ref={finRef} />
+      </div>
+      <form onSubmit={enviar} style={{ display: "flex", gap: 10, marginTop: 14 }}>
+        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={`Escribe a ${amigo.nombre || amigo.usuario}…`} aria-label="Mensaje" style={{ flex: 1, minWidth: 0, padding: "14px 20px", borderRadius: 999, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
+        <button className="btn-cta" type="submit" disabled={!texto.trim()} style={{ ...btnPrimario, minWidth: 0, padding: "13px 26px", opacity: texto.trim() ? 1 : 0.55 }}>Enviar</button>
+      </form>
+    </div>
+  );
+}
+
+// Formulario para elegir el @usuario público (necesario para que te encuentren).
+function ElegirUsuario({ social }) {
+  const [valor, setValor] = useState("");
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const limpio = normalizarUsuario(valor);
+  const guardar = async (e) => {
+    e.preventDefault();
+    setGuardando(true);
+    const { error } = await social.guardarUsuario(limpio);
+    setGuardando(false);
+    setError(error || "");
+  };
+  return (
+    <div className="fadeUp" style={{ background: C.panel, border: `2px solid ${C.line}`, boxShadow: `5px 5px 0 ${C.line}`, borderRadius: 18, padding: "26px 22px", maxWidth: 460, margin: "0 auto" }}>
+      <div style={{ fontSize: 30, textAlign: "center" }}>🙋</div>
+      <div style={{ ...DF, fontWeight: 800, fontSize: 22, textAlign: "center", marginTop: 6 }}>Elige tu nombre de usuario</div>
+      <p style={{ color: C.dim, fontSize: 14, textAlign: "center", margin: "8px 0 18px", lineHeight: 1.6 }}>Es tu identificador público para que tus amigos te encuentren y te agreguen. Minúsculas, números y guion bajo.</p>
+      <form onSubmit={guardar}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, border: `1.5px solid ${C.line}`, borderRadius: 12, background: C.bg, padding: "0 14px" }}>
+          <span style={{ ...DF, color: C.hot1, fontSize: 18 }}>@</span>
+          <input value={valor} onChange={(e) => setValor(e.target.value)} placeholder="tu_usuario" autoFocus maxLength={20} style={{ flex: 1, border: "none", background: "none", padding: "14px 0", fontSize: 16, color: C.text, outline: "none" }} />
+        </div>
+        {limpio && <div style={{ fontSize: 12.5, color: C.dim, marginTop: 8 }}>Serás <b style={{ color: C.text }}>@{limpio}</b></div>}
+        {error && <div style={{ color: C.hot1, fontSize: 13, marginTop: 10 }}>{error}</div>}
+        <button className="btn-cta" type="submit" disabled={guardando || !!validarUsuario(limpio)} style={{ ...btnPrimario, width: "100%", marginTop: 16, padding: 14, opacity: guardando || validarUsuario(limpio) ? 0.6 : 1 }}>{guardando ? "Guardando…" : "Guardar usuario"}</button>
+      </form>
+    </div>
+  );
+}
+
+// Buscador de usuarios por handle (RPC buscar_usuarios) con botón de agregar.
+function BuscarAmigos({ social }) {
+  const [q, setQ] = useState("");
+  const [resultados, setResultados] = useState<any[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [avisos, setAvisos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const termino = normalizarUsuario(q);
+    if (termino.length < 2 || !supabase) { setResultados([]); return; }
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      const { data } = await supabase!.rpc("buscar_usuarios", { termino });
+      setResultados(data ?? []);
+      setBuscando(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const agregar = async (u) => {
+    const codigo = await social.enviarSolicitud(u.usuario);
+    setAvisos((a) => ({ ...a, [u.id]: MENSAJE_SOLICITUD[codigo] || MENSAJE_SOLICITUD.error }));
+  };
+
+  return (
+    <div>
+      <div style={{ position: "relative" }}>
+        <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>🔍</span>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Busca a un amigo por su @usuario…" aria-label="Buscar usuarios" style={{ width: "100%", boxSizing: "border-box", padding: "14px 18px 14px 44px", borderRadius: 12, background: C.panel, border: `1.5px solid ${C.line}`, color: C.text, fontSize: 15 }} />
+      </div>
+      {normalizarUsuario(q).length >= 2 && (
+        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+          {buscando && resultados.length === 0 && <div style={{ color: C.dim, fontSize: 13, padding: "4px 2px" }}>Buscando…</div>}
+          {!buscando && resultados.length === 0 && <div style={{ color: C.dim, fontSize: 13, padding: "4px 2px" }}>Nadie con ese usuario. Prueba con otro nombre.</div>}
+          {resultados.map((u) => (
+            <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "8px 10px" }}>
+              <Avatar nombre={u.nombre || u.usuario} size={36} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ ...DF, fontWeight: 800, fontSize: 14 }}>{u.nombre || u.usuario}</div>
+                <div style={{ fontSize: 12, color: C.dim }}>@{u.usuario}</div>
+              </div>
+              {avisos[u.id]
+                ? <span style={{ fontSize: 12, color: C.dim, maxWidth: 130, textAlign: "right" }}>{avisos[u.id]}</span>
+                : <button className="btn-cta" onClick={() => agregar(u)} style={{ ...btnPrimario, minWidth: 0, padding: "8px 16px", fontSize: 12 }}>+ Agregar</button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sección "Amigos": elegir usuario, buscar y agregar, gestionar solicitudes,
+// ver la lista de amigos y abrir el chat con cada uno. Solo con sesión iniciada.
+function Amigos({ onBack, onLogin, onIrSeccion }) {
+  const { enabled, user } = useAuth();
+  const social = useContext(SocialCtx);
+  const [chatCon, setChatCon] = useState<Amigo | null>(null);
+
+  const cuerpo = () => {
+    if (!enabled) return <Aviso icono="🤝" titulo="Los amigos necesitan Supabase" texto="En esta instalación la app no está conectada a Supabase, así que la parte social no está disponible." />;
+    if (!user) return (
+      <div className="fadeUp" style={{ background: C.panel, borderRadius: 18, padding: "44px 22px", textAlign: "center" }}>
+        <div style={{ fontSize: 30 }}>🤝</div>
+        <div style={{ ...DF, fontWeight: 800, fontSize: 20, marginTop: 8 }}>Conecta con tus amigos</div>
+        <p style={{ color: C.dim, fontSize: 14, margin: "8px auto 20px", maxWidth: 420, lineHeight: 1.6 }}>Agrega amigos, chatea con ellos y compárteles tus recetas favoritas. Inicia sesión para empezar.</p>
+        <button className="btn-cta" onClick={onLogin} style={btnPrimario}>Iniciar sesión</button>
+      </div>
+    );
+    if (!social) return <Aviso icono="⏳" titulo="Un momento" texto="Cargando tu información…" />;
+    if (!social.usuario) return <ElegirUsuario social={social} />;
+    if (chatCon) return <Chat amigo={chatCon} onVolver={() => { setChatCon(null); social.refrescar(); }} />;
+
+    return (
+      <div style={{ display: "grid", gap: 22 }}>
+        <div className="fadeUp" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: C.panel2, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "12px 16px" }}>
+          <Avatar nombre={social.usuario} size={40} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase" }}>Tu usuario</div>
+            <div style={{ ...DF, fontWeight: 800, fontSize: 18 }}>@{social.usuario}</div>
+          </div>
+          <div style={{ fontSize: 12.5, color: C.dim, maxWidth: 220 }}>Comparte tu @usuario para que te agreguen.</div>
+        </div>
+
+        <div className="fadeUp">
+          <SubtituloSocial>Buscar y agregar</SubtituloSocial>
+          <BuscarAmigos social={social} />
+        </div>
+
+        {social.recibidas.length > 0 && (
+          <div className="fadeUp">
+            <SubtituloSocial>Solicitudes recibidas · {social.recibidas.length}</SubtituloSocial>
+            <div style={{ display: "grid", gap: 8 }}>
+              {social.recibidas.map((s) => (
+                <div key={s.amistad_id} style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "8px 10px" }}>
+                  <Avatar nombre={s.nombre || s.usuario} size={36} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ ...DF, fontWeight: 800, fontSize: 14 }}>{s.nombre || s.usuario}</div>
+                    <div style={{ fontSize: 12, color: C.dim }}>@{s.usuario}</div>
+                  </div>
+                  <button className="btn-cta" onClick={() => social.responderSolicitud(s.amistad_id, true)} style={{ ...btnPrimario, minWidth: 0, padding: "8px 14px", fontSize: 12 }}>Aceptar</button>
+                  <button onClick={() => social.responderSolicitud(s.amistad_id, false)} aria-label="Rechazar" style={{ background: "none", border: `1.5px solid ${C.line}`, borderRadius: 10, padding: "8px 12px", fontSize: 12, color: C.dim }}>Rechazar</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {social.enviadas.length > 0 && (
+          <div className="fadeUp">
+            <SubtituloSocial>Solicitudes enviadas · {social.enviadas.length}</SubtituloSocial>
+            <div style={{ display: "grid", gap: 8 }}>
+              {social.enviadas.map((s) => (
+                <div key={s.amistad_id} style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 12, padding: "8px 10px" }}>
+                  <Avatar nombre={s.nombre || s.usuario} size={36} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ ...DF, fontWeight: 800, fontSize: 14 }}>{s.nombre || s.usuario}</div>
+                    <div style={{ fontSize: 12, color: C.dim }}>@{s.usuario}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: C.dim }}>Pendiente</span>
+                  <button onClick={() => social.eliminarAmigo(s.amistad_id)} aria-label="Cancelar solicitud" style={{ background: "none", border: `1.5px solid ${C.line}`, borderRadius: 10, padding: "8px 12px", fontSize: 12, color: C.dim }}>Cancelar</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="fadeUp">
+          <SubtituloSocial>Tus amigos · {social.amigos.length}</SubtituloSocial>
+          {social.amigos.length === 0 ? (
+            <div style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 14, padding: "24px 18px", textAlign: "center", color: C.dim, fontSize: 14, lineHeight: 1.6 }}>Todavía no tienes amigos. Búscalos arriba por su @usuario y envíales una solicitud.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              {social.amigos.map((a) => {
+                const sinLeer = social.noLeidos[a.id] || 0;
+                return (
+                  <button key={a.amistad_id} onClick={() => setChatCon(a)} className="exwrap" style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 12px", color: C.text }}>
+                    <Avatar nombre={a.nombre || a.usuario} size={40} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ ...DF, fontWeight: 800, fontSize: 15 }}>{a.nombre || a.usuario}</div>
+                      <div style={{ fontSize: 12, color: C.dim }}>@{a.usuario}</div>
+                    </div>
+                    {sinLeer > 0 && <span style={{ minWidth: 20, height: 20, padding: "0 5px", boxSizing: "border-box", background: C.hot1, color: "#fff", borderRadius: 999, fontSize: 11, fontWeight: 800, lineHeight: "20px", textAlign: "center" }}>{sinLeer > 9 ? "9+" : sinLeer}</span>}
+                    <span style={{ color: C.dim, fontSize: 20 }}>›</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <CabeceraSeccion banner={BANNER_AMIGOS} kicker="Comunidad · Solo con sesión" titulo={<>Tus <span style={gradText}>amigos</span></>} onBack={onBack} onLogin={onLogin} onIrSeccion={onIrSeccion} actual="amigos" />
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 18px 80px" }}>
+        {cuerpo()}
+      </div>
+    </div>
+  );
+}
+
+// Subtítulo de bloque para la sección de amigos.
+function SubtituloSocial({ children }) {
+  return <div style={{ ...DF, fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 10, letterSpacing: "0.04em" }}>{children}</div>;
+}
+
+// Aviso genérico centrado (sin sesión, sin Supabase, cargando…).
+function Aviso({ icono, titulo, texto }) {
+  return (
+    <div className="fadeUp" style={{ background: C.panel, border: `1px dashed ${C.line}`, borderRadius: 18, padding: "40px 22px", textAlign: "center" }}>
+      <div style={{ fontSize: 30 }}>{icono}</div>
+      <div style={{ ...DF, fontWeight: 800, fontSize: 20, marginTop: 8 }}>{titulo}</div>
+      <p style={{ color: C.dim, fontSize: 14, margin: "8px auto 0", maxWidth: 420, lineHeight: 1.6 }}>{texto}</p>
     </div>
   );
 }

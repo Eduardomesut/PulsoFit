@@ -36,28 +36,46 @@ Por defecto Supabase envía un email de confirmación al registrarse. Para proba
 ---
 
 ### ¿Qué guarda ahora mismo?
-- Un **perfil** por usuario (se crea solo al registrarse).
+- Un **perfil** por usuario (se crea solo al registrarse), con un **@usuario** público opcional para la parte social.
 - El **último plan** generado por cada usuario, que se recupera al iniciar sesión ("Continuar con mi plan guardado").
+- **Recetas de la comunidad**, **favoritos**, **amigos** (`amistades`) y **mensajes** del chat.
 
-Las Fases 2 (registrar progreso) y 3 (amigos y ver su progreso) se construirán sobre esta misma base.
+La Fase 2 (registrar progreso) se construirá sobre esta misma base.
 
 ## 7. Chef IA (chat de cocina para usuarios)
 
-El Chef IA es un chat exclusivo para usuarios con sesión, con **10 consultas al día** por usuario. La clave de la API de Claude nunca toca el navegador: vive como secret en una Edge Function.
+El Chef IA es un chat exclusivo para usuarios con sesión, con **10 consultas al día** por usuario. Usa **Groq**, que tiene un plan **gratuito sin tarjeta**. La clave de la API nunca toca el navegador: vive como secret en una Edge Function.
 
-Pasos (necesitas la [CLI de Supabase](https://supabase.com/docs/guides/cli) y una clave de API de [console.anthropic.com](https://console.anthropic.com)):
+Pasos (necesitas la [CLI de Supabase](https://supabase.com/docs/guides/cli) y una clave gratuita de [console.groq.com/keys](https://console.groq.com/keys)):
 
 1. **Re-ejecuta `supabase/schema.sql`** en el SQL Editor (añade la tabla `chef_usos` y la función `consumir_uso_chef`, que aplica la cuota diaria en la base de datos).
-2. **Vincula el proyecto y guarda la clave como secret:**
+2. **Consigue la clave gratis:** entra en https://console.groq.com, regístrate (sin tarjeta), ve a **API Keys → Create API Key** y copia la clave (empieza por `gsk_...`).
+3. **Vincula el proyecto y guarda la clave como secret:**
    ```bash
    supabase link --project-ref TU_PROJECT_REF
-   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   supabase secrets set GROQ_API_KEY=gsk_...
    ```
-3. **Despliega la función:**
+4. **Despliega la función:**
    ```bash
-   supabase functions deploy chef
+   supabase functions deploy chef --no-verify-jwt
    ```
 
 Nada más. El front ya sabe hablar con ella; si la función no está desplegada, la sección Chef IA muestra un aviso amable y el resto de la app no se ve afectada.
 
-**Coste:** usa Claude Haiku (el modelo económico), con respuestas acotadas y el catálogo compactado: cada consulta cuesta ~0,4 céntimos. Con la cuota de 10/día, incluso 50 usuarios activos a diario quedarían en ~15 €/mes como techo absoluto — y el uso real suele ser una fracción de eso. El límite se cambia en un solo sitio: `LIMITE_DIARIO` en `supabase/functions/chef/index.ts` (y el `limite` por defecto de la función SQL).
+**Coste:** **0 €.** Groq sirve modelos abiertos (Llama 3.3 70B) en su plan gratuito, con límites de uso holgados de sobra para la cuota de 10 consultas/día por usuario. Si algún día quisieras cambiar de proveedor o modelo, se toca en un solo sitio: `MODELO` y la URL de la API en `supabase/functions/chef/index.ts`. El límite diario se cambia en `LIMITE_DIARIO` (y el `limite` por defecto de la función SQL).
+
+> Nota: la función se despliega con `--no-verify-jwt` **a propósito**. No es que no haya seguridad: la propia función valida el JWT de Supabase y rechaza a quien no tenga sesión. Se hace así para que el *preflight* CORS (`OPTIONS`, que el navegador manda sin cabecera de autorización) no lo bloquee la pasarela de Supabase antes de llegar al código.
+
+## 8. Amigos, chat y recetas compartidas (Fase 3)
+
+La sección **Amigos** (solo con sesión) deja agregar amigos por su **@usuario**, chatear en tiempo real y compartir recetas por el chat.
+
+Para activarla basta con **re-ejecutar `supabase/schema.sql`** en el SQL Editor: añade la columna `usuario` a `perfiles`, las tablas `amistades` y `mensajes` con su RLS, las funciones `buscar_usuarios`, `enviar_solicitud` y `estado_social`, y suscribe `mensajes` y `amistades` a **Realtime** (para el chat en vivo y las notificaciones). Todo es aditivo: no toca los datos existentes.
+
+No hace falta ninguna clave ni Edge Function: el chat funciona con la base de datos y las políticas RLS, que garantizan que cada usuario solo ve y escribe en sus propias conversaciones y solo puede mensajear a amigos aceptados.
+
+- **@usuario**: identificador público único (minúsculas, números y `_`, 3-20 caracteres). Se elige la primera vez que se entra en Amigos y sirve para que los demás te encuentren.
+- **Solicitudes**: enviar_solicitud evita duplicados y acepta al vuelo si ya había una solicitud cruzada.
+- **Recetas compartidas**: se guarda una *instantánea* de la receta en el mensaje, así se sigue viendo aunque la original se borre.
+
+> Si en tu proyecto Realtime no estuviera habilitado a nivel global, actívalo en **Database → Replication** (publicación `supabase_realtime`); el `schema.sql` ya añade ahí las tablas. Sin Realtime el chat sigue funcionando, pero los mensajes nuevos aparecen al reabrir la conversación en vez de al instante.

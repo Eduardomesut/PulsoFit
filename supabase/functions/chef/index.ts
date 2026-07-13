@@ -1,20 +1,23 @@
 // ============================================================
-// PULSO · Edge Function "chef" — proxy seguro hacia la API de Claude.
+// PULSO · Edge Function "chef" — proxy seguro hacia un modelo de IA.
 //
-// La clave de la API vive aquí (secret ANTHROPIC_API_KEY), nunca en el
-// navegador. Flujo por petición:
+// Usa Groq (https://groq.com), que ofrece un plan GRATUITO sin tarjeta:
+// modelos abiertos (Llama) servidos muy rápido. La clave de la API vive
+// aquí (secret GROQ_API_KEY), nunca en el navegador. Flujo por petición:
 //   1. Valida el JWT de Supabase (solo usuarios con sesión).
 //   2. Consume un uso de la cuota diaria vía consumir_uso_chef()
 //      (el límite vive en la base de datos, no se puede saltar).
-//   3. Llama a Claude (Haiku, el modelo económico) con streaming y
-//      devuelve el SSE tal cual al navegador (proxy pasante).
+//   3. Llama a Groq (API compatible con OpenAI) con streaming y traduce
+//      sus eventos al formato SSE de Anthropic que ya espera el frontend
+//      (así el cliente no necesita cambios).
 //
-// Despliegue:  supabase functions deploy chef
-// Secret:      supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+// Despliegue:  supabase functions deploy chef --no-verify-jwt
+// Secret:      supabase secrets set GROQ_API_KEY=gsk_...
+//              (la clave gratuita se saca en https://console.groq.com/keys)
 // ============================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const MODELO = "claude-haiku-4-5"; // el más barato: ~0,4 céntimos por consulta
+const MODELO = "llama-3.3-70b-versatile"; // gratis en Groq, de sobra para cocina
 const LIMITE_DIARIO = 10;
 const MAX_TOKENS_RESPUESTA = 700;
 const MAX_MENSAJES = 12; // solo se envía la cola reciente de la conversación
@@ -49,12 +52,53 @@ Reglas:
 
 ${contexto ? `Contexto del usuario y catálogo de PULSO:\n${contexto}` : "El usuario no ha compartido contexto."}`;
 
+// Traduce el streaming de Groq (formato OpenAI: choices[].delta.content)
+// al SSE de Anthropic (content_block_delta / text_delta), que es lo que el
+// frontend ya sabe parsear. Así cambiamos de proveedor sin tocar el cliente.
+const traducirStream = (fuente: ReadableStream<Uint8Array>) => {
+  const lector = fuente.getReader();
+  const decodificador = new TextDecoder();
+  const codificador = new TextEncoder();
+  let bufer = "";
+
+  const emitir = (controller: ReadableStreamDefaultController, texto: string) =>
+    controller.enqueue(codificador.encode(
+      `data: ${JSON.stringify({ type: "content_block_delta", delta: { type: "text_delta", text: texto } })}\n\n`,
+    ));
+
+  return new ReadableStream({
+    async pull(controller) {
+      const { value, done } = await lector.read();
+      if (done) {
+        controller.enqueue(codificador.encode(`data: ${JSON.stringify({ type: "message_stop" })}\n\n`));
+        controller.close();
+        return;
+      }
+      bufer += decodificador.decode(value, { stream: true });
+      const lineas = bufer.split("\n");
+      bufer = lineas.pop() ?? "";
+      for (const linea of lineas) {
+        const l = linea.trim();
+        if (!l.startsWith("data:")) continue;
+        const datos = l.slice(5).trim();
+        if (!datos || datos === "[DONE]") continue;
+        try {
+          const evento = JSON.parse(datos);
+          const trozo = evento.choices?.[0]?.delta?.content;
+          if (trozo) emitir(controller, trozo);
+        } catch { /* fragmento incompleto o evento que no interesa */ }
+      }
+    },
+    cancel() { lector.cancel(); },
+  });
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "Método no permitido" });
 
-  const claveApi = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!claveApi) return json(500, { error: "El chef no está configurado todavía (falta ANTHROPIC_API_KEY)." });
+  const claveApi = Deno.env.get("GROQ_API_KEY");
+  if (!claveApi) return json(500, { error: "El chef no está configurado todavía (falta GROQ_API_KEY)." });
 
   // 1. Solo usuarios con sesión: el cliente de Supabase hereda el JWT de la
   //    petición, y consumir_uso_chef() usa ese mismo auth.uid().
@@ -75,43 +119,44 @@ Deno.serve(async (req) => {
   let cuerpo: { mensajes?: { rol?: string; texto?: string }[]; contexto?: string };
   try { cuerpo = await req.json(); } catch { return json(400, { error: "Petición inválida." }); }
 
-  const mensajes = (cuerpo.mensajes ?? [])
+  const conversacion = (cuerpo.mensajes ?? [])
     .filter((m) => (m.rol === "usuario" || m.rol === "chef") && typeof m.texto === "string" && m.texto.trim())
     .slice(-MAX_MENSAJES)
     .map((m) => ({
       role: m.rol === "usuario" ? "user" : "assistant",
       content: m.texto!.slice(0, MAX_CHARS_MENSAJE),
     }));
-  while (mensajes.length && mensajes[0].role !== "user") mensajes.shift();
-  if (!mensajes.length) return json(400, { error: "Escribe una pregunta para el chef." });
+  while (conversacion.length && conversacion[0].role !== "user") conversacion.shift();
+  if (!conversacion.length) return json(400, { error: "Escribe una pregunta para el chef." });
 
   const contexto = typeof cuerpo.contexto === "string" ? cuerpo.contexto.slice(0, MAX_CHARS_CONTEXTO) : "";
 
-  // 4. Llama a Claude con streaming y devuelve el SSE tal cual (proxy
-  //    pasante: no reconstruimos los eventos, solo los reenviamos).
-  const respuesta = await fetch("https://api.anthropic.com/v1/messages", {
+  // En la API de Groq (compatible con OpenAI) el "system" va como primer
+  // mensaje de la lista, no como parámetro aparte.
+  const mensajes = [{ role: "system", content: construirSystem(contexto) }, ...conversacion];
+
+  // 4. Llama a Groq con streaming; traducimos su SSE al formato de Anthropic.
+  const respuesta = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
-      "x-api-key": claveApi,
-      "anthropic-version": "2023-06-01",
+      "authorization": `Bearer ${claveApi}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({
       model: MODELO,
       max_tokens: MAX_TOKENS_RESPUESTA,
       stream: true,
-      system: construirSystem(contexto),
       messages: mensajes,
     }),
   });
 
-  if (!respuesta.ok) {
+  if (!respuesta.ok || !respuesta.body) {
     const detalle = await respuesta.text().catch(() => "");
-    console.error("Error de la API de Claude:", respuesta.status, detalle);
+    console.error("Error de la API de Groq:", respuesta.status, detalle);
     return json(502, { error: "El chef está fuera de la cocina un momento. Inténtalo de nuevo en unos segundos." });
   }
 
-  return new Response(respuesta.body, {
+  return new Response(traducirStream(respuesta.body), {
     headers: {
       ...CORS,
       "content-type": "text/event-stream",

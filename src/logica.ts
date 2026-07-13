@@ -635,3 +635,51 @@ export function validarRecetaComunidad(borrador) {
   if (pasos.length < 2) errores.push("Describe la elaboración en al menos 2 pasos.");
   return errores;
 }
+
+/* ============================================================
+   Social: amigos, chat y recetas compartidas (Fase 3)
+   ============================================================ */
+
+/* Normaliza un handle propuesto para el @usuario: minúsculas, sin acentos y
+   solo caracteres válidos. Se aplica según se escribe, como un "slug". */
+export const normalizarUsuario = (s) =>
+  (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9_]/g, "");
+
+/* Valida un nombre de usuario ya normalizado. Devuelve un mensaje en
+   castellano con el problema, o null si es válido. Mismas reglas que la
+   restricción `perfiles_usuario_formato` de la base de datos. */
+export function validarUsuario(u) {
+  const v = (u || "").trim();
+  if (v.length < 3) return "El usuario debe tener al menos 3 caracteres.";
+  if (v.length > 20) return "El usuario no puede pasar de 20 caracteres.";
+  if (!/^[a-z0-9_]+$/.test(v)) return "Solo minúsculas, números y guion bajo (_), sin espacios ni acentos.";
+  return null;
+}
+
+/* Mensaje en castellano para cada código que devuelve la RPC enviar_solicitud. */
+export const MENSAJE_SOLICITUD = {
+  enviada: "Solicitud enviada.",
+  aceptada: "¡Ya sois amigos! Teníais una solicitud cruzada.",
+  ya_amigos: "Ya sois amigos.",
+  ya_pendiente: "Ya le habías enviado una solicitud.",
+  no_existe: "No existe ningún usuario con ese nombre.",
+  uno_mismo: "No puedes agregarte a ti mismo.",
+  error: "No se pudo enviar la solicitud. Inténtalo de nuevo.",
+};
+
+/* Instantánea mínima de una receta (modelo unificado de ficha) para compartirla
+   por chat. Se guarda en mensajes.receta y basta para volver a mostrarla aunque
+   la receta original desaparezca del catálogo o de la comunidad. */
+export function recetaSnapshot(r) {
+  if (!r || !r.nombre) return null;
+  return {
+    id: r.id ?? null,
+    nombre: r.nombre,
+    img: r.img && r.img in FOODIMG ? r.img : "otro",
+    kcal: r.kcal ?? r.kcalAprox ?? null,
+    ingredientes: Array.isArray(r.ingredientes) ? r.ingredientes : [],
+    pasos: Array.isArray(r.pasos) ? r.pasos : [],
+    fotoPlato: r.fotoPlato ?? null,
+    fotoEscena: r.fotoEscena ?? null,
+  };
+}
