@@ -17,6 +17,9 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
+# vite-plugin-pwa: service worker de desarrollo (npm run dev), no de producción
+dev-dist
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
