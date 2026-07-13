@@ -23,6 +23,30 @@ function useScrollSuave() {
     return () => { gsap.ticker.remove(ticker); lenis.destroy(); };
   }, []);
 }
+
+/* Escucha el aviso de instalación de la PWA (Android/desktop; Safari/iOS no
+   lo dispara nunca, ahí la instalación es manual vía "Compartir → Añadir a
+   pantalla de inicio"). Guarda el evento para poder relanzarlo al pulsar el
+   botón — el navegador solo lo entrega una vez y hay que quedárselo. */
+function useInstalarPWA() {
+  const aviso = useRef<any>(null);
+  const [disponible, setDisponible] = useState(false);
+  useEffect(() => {
+    const alDisponible = (e) => { e.preventDefault(); aviso.current = e; setDisponible(true); };
+    const alInstalar = () => { aviso.current = null; setDisponible(false); };
+    window.addEventListener("beforeinstallprompt", alDisponible);
+    window.addEventListener("appinstalled", alInstalar);
+    return () => { window.removeEventListener("beforeinstallprompt", alDisponible); window.removeEventListener("appinstalled", alInstalar); };
+  }, []);
+  const instalar = async () => {
+    if (!aviso.current) return;
+    aviso.current.prompt();
+    await aviso.current.userChoice;
+    aviso.current = null;
+    setDisponible(false);
+  };
+  return { disponible, instalar };
+}
 import {
   U, youtubeUrl, normalizar, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS,
   RECETAS, RECETAS_CINE, RECETAS_ACTUALIDAD, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
@@ -712,6 +736,7 @@ function FotosFlotantes() {
 }
 
 function Hero({ onStart, onLogin, planGuardado, onRetomar, onIrSeccion }) {
+  const { disponible: pwaDisponible, instalar: instalarPWA } = useInstalarPWA();
   return (
     <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
@@ -743,6 +768,9 @@ function Hero({ onStart, onLogin, planGuardado, onRetomar, onIrSeccion }) {
             <div key={t} style={{ textAlign: "center" }}><div style={{ ...DF, fontSize: 26, color: C.hot1 }}>{n}</div><div style={{ fontSize: 10, color: C.dim, letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 3, fontWeight: 600 }}>{t}</div></div>
           ))}
         </div>
+        {pwaDisponible && (
+          <button onClick={instalarPWA} style={{ background: "none", border: `1.5px dashed ${C.line}`, color: C.text, borderRadius: 999, padding: "8px 18px", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em" }}>⬇ Instalar PULSO en el móvil</button>
+        )}
       </div>
     </div>
   );
