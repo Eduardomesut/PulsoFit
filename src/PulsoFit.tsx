@@ -49,7 +49,7 @@ function useInstalarPWA() {
 }
 import {
   U, youtubeUrl, normalizar, FOODIMG, TIPOS_DIETA, ALERGENOS, ALIMENTOS,
-  RECETAS, RECETAS_CINE, RECETAS_ACTUALIDAD, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos,
+  RECETAS, RECETAS_CINE, RECETAS_ACTUALIDAD, REPARTO, buildDiet, calcularMetricas, OBJETIVOS, migrarDatos, indiceDiaHoy,
   INGREDIENTES_WEB, CATEGORIAS_RECETA, validarRecetaComunidad, puedeBorrarReceta,
   resumenCatalogo, resumenUsuario,
   normalizarUsuario, validarUsuario, MENSAJE_SOLICITUD, recetaSnapshot,
@@ -917,8 +917,12 @@ function Scan({ onDone }) {
 }
 
 function Plan({ datos, onReset, onLogin, onIrSeccion }) {
-  const [diaDieta, setDiaDieta] = useState(0);
+  // El calendario decide qué día se ve al entrar: hoy, no siempre lunes.
+  const hoyIdx = useMemo(() => indiceDiaHoy(), []);
+  const [diaDieta, setDiaDieta] = useState(hoyIdx);
   const [recetaAbierta, setRecetaAbierta] = useState<string | null>(null);
+  const [ingredientesAbiertos, setIngredientesAbiertos] = useState(false);
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [guardado, setGuardado] = useState(false);
   const { user, enabled } = useAuth();
   const m = useMemo(() => calcularMetricas(datos), [datos]);
@@ -926,6 +930,29 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
   const obj = OBJETIVOS.find((o) => o.id === datos.objetivo);
   const tipoDieta = TIPOS_DIETA.find((t) => t.id === datos.tipoDieta);
   const alergiasNombres = ALERGENOS.filter((a) => datos.alergias.includes(a.id)).map((a) => a.nombre);
+  const marcarIngrediente = (clave) => setMarcados((s) => {
+    const n = new Set(s);
+    n.has(clave) ? n.delete(clave) : n.add(clave);
+    return n;
+  });
+  // Ingredientes de todas las comidas de hoy, agrupados por nombre (varias
+  // recetas pueden compartir un ingrediente): cada cantidad se lista tal
+  // cual viene de la receta, sin sumar unidades distintas entre sí.
+  const ingredientesHoy = useMemo(() => {
+    const mapa = new Map<string, { nombre: string; cantidades: string[] }>();
+    dieta[hoyIdx].comidas.forEach((c) => {
+      c.receta.ingredientes.forEach((ing) => {
+        const clave = normalizar(ing.nombre);
+        if (!mapa.has(clave)) mapa.set(clave, { nombre: ing.nombre, cantidades: [] });
+        mapa.get(clave)!.cantidades.push(ing.cantidad);
+      });
+    });
+    return [...mapa.entries()].map(([clave, v]) => ({ clave, ...v })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [dieta, hoyIdx]);
+  const fechaHoy = useMemo(() => {
+    const s = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }, []);
 
   // Si el usuario ha iniciado sesión, guarda su plan en la nube (uno por usuario).
   useEffect(() => {
@@ -1078,6 +1105,43 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
             </div>
           ))}
         </section>
+        {/* "Hoy": el calendario decide qué día es, sin que el usuario tenga
+            que ir buscándolo entre las pestañas de la semana. */}
+        <div className="fadeUp" style={{ marginTop: 20, background: C.panel, border: `2px solid ${C.hot1}`, borderRadius: 20, padding: "20px 22px", boxShadow: `4px 4px 0 ${C.line}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: C.hot1, fontWeight: 800 }}>📅 Hoy</div>
+              <div style={{ ...DF, fontSize: 22, fontWeight: 800, marginTop: 4 }}>{fechaHoy}</div>
+              <div style={{ color: C.dim, fontSize: 13, marginTop: 4 }}>Te toca: {dieta[hoyIdx].comidas.map((c) => c.receta.nombre).join(" · ")}</div>
+            </div>
+            {diaDieta !== hoyIdx && (
+              <button onClick={() => setDiaDieta(hoyIdx)} style={{ flexShrink: 0, background: "none", border: `1.5px solid ${C.line}`, color: C.text, borderRadius: 9, padding: "8px 16px", fontSize: 13, fontWeight: 700 }}>Ir a hoy</button>
+            )}
+          </div>
+          <button onClick={() => setIngredientesAbiertos((a) => !a)} style={{ ...btnSecundario, marginTop: 14, minWidth: 0, padding: "10px 20px", fontSize: 13 }}>
+            {ingredientesAbiertos ? "Ocultar ingredientes de hoy" : `Ver ingredientes de hoy (${ingredientesHoy.length})`}
+          </button>
+          {ingredientesAbiertos && (
+            <ul className="fadeUp" style={{ margin: "16px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 9 }}>
+              {ingredientesHoy.map((ing) => {
+                const marcado = marcados.has(ing.clave);
+                return (
+                  <li key={ing.clave}>
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, lineHeight: 1.4, color: marcado ? C.dim : C.text, textDecoration: marcado ? "line-through" : "none", cursor: "pointer" }}>
+                      <input type="checkbox" checked={marcado} onChange={() => marcarIngrediente(ing.clave)} style={{ accentColor: C.hot1, width: 16, height: 16, flexShrink: 0, marginTop: 2 }} />
+                      {/* Ancho fijo (no minWidth): si el mismo ingrediente sale en varias
+                          recetas del día, sus cantidades se unen con "+" y pueden ser
+                          largas — con minWidth el texto empujaría el nombre fuera de la
+                          tarjeta; con width fijo, hace wrap dentro de la columna. */}
+                      <span style={{ ...DF, fontWeight: 800, fontSize: 13, width: 92, flexShrink: 0 }}>{ing.cantidades.join(" + ")}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>{ing.nombre}</span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
         <div className="fadeUp" style={{ marginTop: 26 }}>
           <div style={{ position: "relative", height: 150, borderRadius: 20, overflow: "hidden", marginBottom: 14 }}>
             <img src={BANNER_DIETA} alt="" onError={onImgError} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1100,7 +1164,7 @@ function Plan({ datos, onReset, onLogin, onIrSeccion }) {
           )}
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 18 }}>
             {dieta.map((d, i) => (
-              <button key={d.dia} onClick={() => setDiaDieta(i)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 14, border: `1.5px solid ${diaDieta === i ? C.hot1 : C.line}`, color: diaDieta === i ? "#0F2C56" : C.dim, ...(diaDieta === i ? grad : { background: C.panel }) }}>{d.dia}</button>
+              <button key={d.dia} onClick={() => setDiaDieta(i)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 14, border: `1.5px solid ${diaDieta === i ? C.hot1 : C.line}`, color: diaDieta === i ? "#0F2C56" : C.dim, ...(diaDieta === i ? grad : { background: C.panel }) }}>{d.dia}{i === hoyIdx ? " · Hoy" : ""}</button>
             ))}
           </div>
           <div style={{ display: "grid", gap: 14 }}>
