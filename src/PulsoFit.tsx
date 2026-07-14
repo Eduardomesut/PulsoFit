@@ -305,6 +305,36 @@ export default function App() {
   // Estado social (amigos, chat, notificaciones): activo solo con sesión.
   const social = useSocialProvider(user);
 
+  // Tutorial de bienvenida: se arranca solo la primera vez que el usuario
+  // inicia sesión (perfiles.tutorial_visto = false). Se comprueba solo con
+  // `user?.id` (no con `user` entero) para no repetir la consulta ni reiniciar
+  // un tutorial ya en marcha cuando Supabase renueva el token en segundo plano.
+  const [tutorial, setTutorial] = useState<{ paso: number } | null>(null);
+  useEffect(() => {
+    if (!supabase || !user) return;
+    supabase.from("perfiles").select("tutorial_visto").eq("id", user.id).maybeSingle()
+      .then(({ data }) => {
+        if (data && data.tutorial_visto === false) setTutorial((t) => t ?? { paso: 0 });
+      });
+  }, [user?.id]);
+  const finalizarTutorial = () => {
+    setTutorial(null);
+    if (supabase && user) supabase.from("perfiles").update({ tutorial_visto: true }).eq("id", user.id).then(() => {});
+  };
+  const avanzarTutorial = () => {
+    if (!tutorial) return;
+    const siguiente = tutorial.paso + 1;
+    if (siguiente >= PASOS_TUTORIAL.length) { finalizarTutorial(); return; }
+    setFase(PASOS_TUTORIAL[siguiente].fase);
+    setTutorial({ paso: siguiente });
+  };
+  const retrocederTutorial = () => {
+    if (!tutorial || tutorial.paso === 0) return;
+    const anterior = tutorial.paso - 1;
+    setFase(PASOS_TUTORIAL[anterior].fase);
+    setTutorial({ paso: anterior });
+  };
+
   return (
     <RutinaCtx.Provider value={irARutina}>
     <FavoritosCtx.Provider value={ctxFavoritos}>
@@ -373,6 +403,16 @@ export default function App() {
       {fase === "chef" && <Chef datos={datos} onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {fase === "amigos" && <Amigos onBack={() => setFase(seccionDesde)} onLogin={() => setAuthAbierto(true)} onIrSeccion={irSeccion} />}
       {authAbierto && <AuthModal onClose={() => setAuthAbierto(false)} />}
+      {tutorial && (
+        <TutorialOverlay
+          paso={tutorial.paso}
+          total={PASOS_TUTORIAL.length}
+          actual={PASOS_TUTORIAL[tutorial.paso]}
+          onSiguiente={avanzarTutorial}
+          onAtras={retrocederTutorial}
+          onOmitir={finalizarTutorial}
+        />
+      )}
     </div>
     </SocialCtx.Provider>
     </FavoritosCtx.Provider>
@@ -456,6 +496,54 @@ function CuentaChip({ onLogin, vertical = false }) {
       <span className="nav-item" style={{ ...item, color: C.dim, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>{nombre}</span>
       <button className="nav-item" onClick={() => signOut()} style={item}>Salir</button>
     </>
+  );
+}
+
+// Tutorial de bienvenida: recorrido guiado de 6 pasos que se muestra la
+// primera vez que un usuario inicia sesión (según `tutorial_visto` en su
+// perfil). Cada paso indica a qué fase navegar automáticamente. Las fases
+// "form"/"plan" quedan fuera a propósito: un usuario nuevo aún no tiene
+// `datos.objetivo`, así que el cierre anima a crear el plan por su cuenta.
+const PASOS_TUTORIAL = [
+  { fase: "hero", emoji: "👋", titulo: "¡Bienvenido a PULSO!", texto: "Te enseñamos en un momento dónde está todo. Puedes omitir este tutorial cuando quieras." },
+  { fase: "recetario", emoji: "📖", titulo: "Recetario", texto: "Todas las recetas del catálogo (y las de la comunidad) en un solo sitio. Búscalas por nombre o ingrediente y fíltralas por categoría." },
+  { fase: "restaurantes", emoji: "📍", titulo: "Restaurantes", texto: "Encuentra restaurantes cerca de ti según tu tipo de dieta, directamente en el mapa." },
+  { fase: "chef", emoji: "🧑‍🍳", titulo: "Chef IA", texto: "Chatea con nuestro Chef IA para resolver dudas de cocina y adaptar tus recetas." },
+  { fase: "amigos", emoji: "🤝", titulo: "Amigos", texto: "Conecta con otros usuarios, comparte recetas y chatea con tus amigos." },
+  { fase: "hero", emoji: "🎉", titulo: "¡Ya estás list@!", texto: "Ahora pulsa \"Crear mi plan\" para generar tu dieta semanal personalizada. ¡A por ello!" },
+];
+
+// Tarjeta flotante (no bloqueante) que acompaña el recorrido guiado: barra de
+// progreso, explicación del paso actual y controles Atrás/Siguiente/Omitir.
+// No es un lightbox a pantalla completa a propósito: no bloquea el resto de
+// la interfaz, así el usuario puede seguir explorando libremente mientras el
+// tutorial sigue disponible para retomarlo o saltarlo.
+function TutorialOverlay({ paso, total, actual, onSiguiente, onAtras, onOmitir }: any) {
+  const ultimo = paso === total - 1;
+  return (
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 150, display: "flex", justifyContent: "center", padding: "0 14px 14px", pointerEvents: "none" }}>
+      <div className="fadeUp" style={{ pointerEvents: "auto", width: "100%", maxWidth: 480, background: "#fff", border: `2px solid ${C.line}`, borderRadius: 16, boxShadow: `8px 8px 0 ${C.line}`, padding: 20 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {Array.from({ length: total }).map((_, i) => (
+            <div key={i} style={{ flex: 1, height: 5, borderRadius: 999, background: i <= paso ? C.hot2 : C.panel2 }} />
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <div style={{ fontSize: 28, lineHeight: 1 }} aria-hidden="true">{actual.emoji}</div>
+          <div>
+            <div style={{ ...DF, fontSize: 18 }}>{actual.titulo}</div>
+            <p style={{ margin: "6px 0 0", color: C.dim, fontSize: 13.5, lineHeight: 1.5 }}>{actual.texto}</p>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, gap: 10, flexWrap: "wrap" }}>
+          <button onClick={onOmitir} style={{ background: "none", border: "none", color: C.dim, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", padding: "6px 4px" }}>Omitir tutorial</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {paso > 0 && <button onClick={onAtras} style={{ ...btnSecundario, padding: "10px 18px", minWidth: 0, fontSize: 12 }}>← Atrás</button>}
+            <button className="btn-cta" onClick={onSiguiente} style={{ ...btnPrimario, padding: "10px 18px", minWidth: 0, fontSize: 12 }}>{ultimo ? "¡Empezar!" : "Siguiente"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

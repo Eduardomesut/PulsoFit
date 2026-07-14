@@ -382,5 +382,17 @@ begin
 end $$;
 
 -- ============================================================
+-- Tutorial de bienvenida
+-- ============================================================
+
+-- Marca si el usuario ya ha visto (o saltado) el tutorial guiado que
+-- aparece la primera vez que inicia sesión. Migración en dos pasos para que
+-- las cuentas ya existentes queden marcadas como "vistas" (no se les
+-- interrumpe con el tutorial) mientras que las cuentas nuevas, creadas por
+-- el trigger `handle_new_user`, arrancan en `false` gracias al nuevo DEFAULT.
+alter table public.perfiles add column if not exists tutorial_visto boolean not null default true;
+alter table public.perfiles alter column tutorial_visto set default false;
+
+-- ============================================================
 -- La Fase 2 (progreso) añadirá la tabla `registros` aquí más adelante.
 -- ============================================================
