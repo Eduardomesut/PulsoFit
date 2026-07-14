@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizar, youtubeUrl, SEMANA, REPARTO, ALIMENTOS, RECETAS,
   filtrarRecetas, buildDiet, calcularMetricas, migrarDatos,
-  resumenCatalogo, resumenUsuario,
+  resumenCatalogo, resumenUsuario, indiceDiaHoy,
 } from "./logica";
 
 // Datos completos de un usuario sin ninguna restricción, base de muchos tests.
@@ -197,6 +197,22 @@ describe("buildDiet", () => {
         expect(c.receta.alergenos).toEqual([]);
       }
     }
+  });
+});
+
+describe("indiceDiaHoy", () => {
+  it("mapea cada día de la semana a su índice en SEMANA (0=Lunes...6=Domingo)", () => {
+    // 2026-07-13 es lunes; recorremos una semana completa desde ahí.
+    const base = new Date(2026, 6, 13);
+    SEMANA.forEach((_, i) => {
+      const fecha = new Date(base);
+      fecha.setDate(base.getDate() + i);
+      expect(indiceDiaHoy(fecha), SEMANA[i]).toBe(i);
+    });
+  });
+
+  it("sin argumento usa la fecha actual", () => {
+    expect(indiceDiaHoy()).toBe(indiceDiaHoy(new Date()));
   });
 });
 

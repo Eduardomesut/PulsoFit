@@ -522,6 +522,12 @@ export function buildDiet(datos, kcal) {
   }));
 }
 
+// Índice (0=Lunes...6=Domingo, mismo orden que SEMANA/buildDiet) del día de
+// hoy. Date.getDay() empieza en domingo=0; el +6 %7 lo realinea a lunes=0.
+export function indiceDiaHoy(fecha = new Date()) {
+  return (fecha.getDay() + 6) % 7;
+}
+
 export function calcularMetricas({ sexo, edad, peso, altura, objetivo }) {
   const tmb = 10 * peso + 6.25 * altura - 5 * edad + (sexo === "hombre" ? 5 : -161);
   const tdee = tmb * 1.5;
