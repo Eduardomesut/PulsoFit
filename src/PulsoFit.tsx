@@ -107,6 +107,12 @@ const BANNER_AMIGOS = U("1543269865-cbf427effbad"); // amigos brindando, cabecer
    sin arrastrar la prop por todas. */
 const RutinaCtx = createContext<null | (() => void)>(null);
 
+/* Relanzar el tutorial de bienvenida a mano desde el menú: App lo rellena con
+   sesión iniciada (null en invitado) para que las cuentas ya existentes —a las
+   que el tutorial no les salta solo— puedan volver a verlo cuando quieran. Va
+   por contexto para que la cabecera y el menú lateral lo lean directamente. */
+const TutorialCtx = createContext<null | (() => void)>(null);
+
 /* Favoritos del usuario: ids de receta guardados en la tabla `favoritos`.
    App lo rellena solo con sesión iniciada; null (invitado o sin Supabase)
    oculta los corazones de las fichas y el enlace del menú. Va por contexto
@@ -334,9 +340,17 @@ export default function App() {
     setFase(PASOS_TUTORIAL[anterior].fase);
     setTutorial({ paso: anterior });
   };
+  // Relanzar el tutorial a mano (desde el menú): arranca desde el primer paso
+  // y navega a su fase. Útil para las cuentas ya existentes, a las que el
+  // tutorial no les aparece solo. Solo se ofrece con sesión iniciada.
+  const iniciarTutorial = () => {
+    setFase(PASOS_TUTORIAL[0].fase);
+    setTutorial({ paso: 0 });
+  };
 
   return (
     <RutinaCtx.Provider value={irARutina}>
+    <TutorialCtx.Provider value={user ? iniciarTutorial : null}>
     <FavoritosCtx.Provider value={ctxFavoritos}>
     <SocialCtx.Provider value={social}>
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: MONO, fontSize: 14 }}>
@@ -416,6 +430,7 @@ export default function App() {
     </div>
     </SocialCtx.Provider>
     </FavoritosCtx.Provider>
+    </TutorialCtx.Provider>
     </RutinaCtx.Provider>
   );
 }
@@ -601,6 +616,7 @@ function MenuCategorias({ actual, onIrSeccion, user }) {
   const [abierto, setAbierto] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const tl = useRef<gsap.core.Timeline | null>(null);
+  const iniciarTutorial = useContext(TutorialCtx);
   const enlaces = categoriasNav(user);
   const dentro = enlaces.some(([id]) => id === actual);
 
@@ -631,6 +647,9 @@ function MenuCategorias({ actual, onIrSeccion, user }) {
           {enlaces.map(([id, t]) => (
             <BotonCartel key={id} className="cat-enlace" variante="bloque" activo={actual === id} onClick={() => { setAbierto(false); onIrSeccion(id); }} style={{ fontSize: 12.5, padding: "11px 14px" }}>{t}</BotonCartel>
           ))}
+          {iniciarTutorial && (
+            <BotonCartel className="cat-enlace" variante="bloque" onClick={() => { setAbierto(false); iniciarTutorial(); }} style={{ fontSize: 12.5, padding: "11px 14px" }}>🎓 Ver tutorial</BotonCartel>
+          )}
         </div>
       </div>
     </div>
@@ -707,6 +726,7 @@ function Cabecera({ onIrSeccion, onLogin, onInicio, actual, acciones }: any) {
 // reversa y solo entonces se desmonta (por eso el cierre pasa por `cerrar`).
 function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
   const irARutina = useContext(RutinaCtx);
+  const iniciarTutorial = useContext(TutorialCtx);
   const { user } = useAuth();
   const velo = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -740,6 +760,7 @@ function MenuLateral({ onCerrar, onIrSeccion, onLogin, onInicio, actual }) {
           <BotonCartel key={id} className="menu-enlace" variante="bloque" activo={actual === id} onClick={ir(() => onIrSeccion(id))}>{t}</BotonCartel>
         ))}
         {user && <span className="menu-enlace"><EnlaceAmigos variante="bloque" actual={actual} onClick={ir(() => onIrSeccion("amigos"))} /></span>}
+        {iniciarTutorial && <BotonCartel className="menu-enlace" variante="bloque" onClick={ir(iniciarTutorial)}>🎓 Ver tutorial</BotonCartel>}
         <div className="menu-enlace" style={{ height: 1, background: C.line, margin: "10px 4px" }} />
         <span className="menu-enlace"><CuentaChip onLogin={ir(onLogin)} vertical /></span>
       </div>
