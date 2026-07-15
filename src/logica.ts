@@ -445,6 +445,14 @@ export const RECETAS_CINE = [
 //   cargar se cae a la foto de FOODIMG según `img`.
 export const RECETAS_ACTUALIDAD = [
   {
+    id: "tourFrancia2026Aligot", categoria: "deporte", titular: "Tadej Pogačar gana en solitario la etapa 10 del Tour de Francia 2026 en Le Lioran, en pleno Cantal", fecha: "2026-07-14",
+    plato: "Aligot auvernés", img: "patata",
+    fuente: "https://en.wikipedia.org/wiki/2026_Tour_de_France",
+    escena: "La etapa reina de mitad de Tour terminó cuesta arriba en Le Lioran, corazón del Cantal y cuna del aligot: el puré de patata que los queseros de Auvernia estiran con tome fraîche hasta que se vuelve un hilo elástico y brillante. Mientras Pogačar apretaba el maillot amarillo en la subida, en las fondas de la zona seguían removiendo la olla sin parar, como manda la tradición.",
+    ingredientes: [{ nombre: "Patata", cantidad: "1 kg" }, { nombre: "Tome fraîche (o mozzarella fresca)", cantidad: "400 g" }, { nombre: "Mantequilla", cantidad: "50 g" }, { nombre: "Nata para cocinar", cantidad: "100 ml" }, { nombre: "Ajo", cantidad: "2 dientes" }, { nombre: "Sal y pimienta", cantidad: "al gusto" }],
+    pasos: ["Cuece las patatas peladas y troceadas en agua con sal hasta que estén muy tiernas.", "Escúrrelas y hazlas puré fino, junto con el ajo picado, mientras aún están calientes.", "Vuelve a poner el puré al fuego suave e incorpora la mantequilla y la nata, removiendo sin parar.", "Añade la tome fraîche en tiras y sigue removiendo con energía en una sola dirección hasta que el aligot forme hilos largos y elásticos.", "Sirve de inmediato, bien caliente, levantando la cuchara para lucir esos hilos característicos."],
+  },
+  {
     id: "sanfermin2026Pochas", categoria: "efemeride", titular: "Comienza en Pamplona la semana grande de los Sanfermines 2026, con el chupinazo y los encierros diarios", fecha: "2026-07-06",
     plato: "Pochas a la Navarra", img: "legumbre",
     fuente: "https://es.wikipedia.org/wiki/Sanfermines",
