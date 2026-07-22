@@ -445,6 +445,14 @@ export const RECETAS_CINE = [
 //   cargar se cae a la foto de FOODIMG según `img`.
 export const RECETAS_ACTUALIDAD = [
   {
+    id: "mundial2026Tortilla", categoria: "deporte", titular: "España se proclama campeona del Mundial 2026 al vencer a Argentina 1-0 en la prórroga, con gol de Ferran Torres", fecha: "2026-07-19",
+    plato: "Tortilla de patatas de la Roja", img: "huevo",
+    fuente: "https://es.wikipedia.org/wiki/Copa_Mundial_de_F%C3%BAtbol_de_2026",
+    escena: "Con un gol de Ferran Torres en la prórroga, España se colgó su segunda estrella mundialista en Nueva Jersey. Esa misma noche, en cada bar y cada casa del país, la celebración tuvo el mismo acompañante de siempre: una tortilla de patatas bien jugosa, cortada en porciones para compartir mientras se repetía la jugada del gol una y otra vez.",
+    ingredientes: [{ nombre: "Patata", cantidad: "600 g" }, { nombre: "Huevo", cantidad: "6 unidades" }, { nombre: "Cebolla", cantidad: "1 unidad" }, { nombre: "Aceite de oliva", cantidad: "150 ml" }, { nombre: "Sal", cantidad: "al gusto" }],
+    pasos: ["Pela y corta las patatas y la cebolla en láminas finas.", "Fríelas a fuego suave en el aceite hasta que estén tiernas, sin que lleguen a dorarse.", "Escurre bien el aceite y mezcla las patatas y la cebolla con los huevos batidos y una pizca de sal.", "Cuaja la tortilla en una sartén antiadherente, dándole la vuelta con un plato para que quede jugosa por dentro.", "Déjala reposar unos minutos y sírvela en porciones, como se hizo esa noche en toda España."],
+  },
+  {
     id: "sanfermin2026Pochas", categoria: "efemeride", titular: "Comienza en Pamplona la semana grande de los Sanfermines 2026, con el chupinazo y los encierros diarios", fecha: "2026-07-06",
     plato: "Pochas a la Navarra", img: "legumbre",
     fuente: "https://es.wikipedia.org/wiki/Sanfermines",
